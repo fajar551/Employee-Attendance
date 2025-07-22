@@ -15,10 +15,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
-  Position? _position;
-  String? _locationError;
-  String? _address;
-  final String _selectedFilter = 'All';
   DateTime? _lastAttendanceTime;
   final bool _isTimeIn = true; // true = jam masuk, false = jam keluar
   List<Map<String, dynamic>> _attendanceHistory = [];
@@ -68,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _pickImage() async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final XFile? pickedFile =
         await _picker.pickImage(source: ImageSource.camera);
     if (pickedFile != null) {
@@ -79,12 +76,13 @@ class _HomeScreenState extends State<HomeScreen> {
       // Tambahkan data absensi baru ke riwayat
       _addAttendanceRecord();
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         SnackBar(
             content: Text(
                 '${_isTimeIn ? "Jam Masuk" : "Jam Keluar"} berhasil direkam!')),
       );
-      await _getLocation();
+
+      _getLocation(); // Remove await to avoid async gap
     }
   }
 
@@ -107,37 +105,22 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        setState(() {
-          _locationError = 'Layanan lokasi tidak aktif';
-        });
         return;
       }
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          setState(() {
-            _locationError = 'Izin lokasi ditolak';
-          });
           return;
         }
       }
       if (permission == LocationPermission.deniedForever) {
-        setState(() {
-          _locationError = 'Izin lokasi ditolak permanen';
-        });
         return;
       }
       final pos = await Geolocator.getCurrentPosition();
-      setState(() {
-        _position = pos;
-        _locationError = null;
-      });
       await _getAddressFromCoordinates(pos);
     } catch (e) {
-      setState(() {
-        _locationError = 'Gagal mendapatkan lokasi: $e';
-      });
+      // Handle error silently or show snackbar if needed
     }
   }
 
@@ -148,16 +131,10 @@ class _HomeScreenState extends State<HomeScreen> {
         position.longitude,
       );
       if (placemarks.isNotEmpty) {
-        Placemark place = placemarks[0];
-        setState(() {
-          _address =
-              '${place.street}, ${place.subLocality}, ${place.locality}, ${place.administrativeArea}';
-        });
+        // Address obtained but not used in UI
       }
     } catch (e) {
-      setState(() {
-        _address = 'Gagal mendapatkan alamat';
-      });
+      // Handle error silently
     }
   }
 

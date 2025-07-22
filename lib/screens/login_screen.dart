@@ -24,7 +24,7 @@ class LoginScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
-                        'Great',
+                        'Absensi',
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
@@ -32,16 +32,18 @@ class LoginScreen extends StatelessWidget {
                         ),
                       ),
                       const Text(
-                        'Da',
+                        'Qw',
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
                           color: Colors.orange,
                         ),
                       ),
+        
                       Container(
-                        width: 32,
-                        height: 32,
+                        width: 20,
+                        height: 20,
+                        margin: const EdgeInsets.only(top: 5),
                         decoration: const BoxDecoration(
                           color: Colors.orange,
                           shape: BoxShape.circle,
@@ -49,7 +51,15 @@ class LoginScreen extends StatelessWidget {
                         child: const Icon(
                           Icons.person,
                           color: Colors.white,
-                          size: 20,
+                          size: 15,
+                        ),
+                      ),
+                       const Text(
+                        'rds',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
                         ),
                       ),
                       const SizedBox(width: 4),
