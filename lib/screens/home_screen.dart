@@ -33,31 +33,36 @@ class _HomeScreenState extends State<HomeScreen> {
         'date': 'Sel, 22 Jul 2025',
         'time': '08:51',
         'hasLocation': true,
-        'status': 'Telah diproses'
+        'status': 'Telah diproses',
+        'imageFile': null, // Data lama tidak punya foto
       },
       {
         'date': 'Sen, 21 Jul 2025',
         'time': '18:02',
         'hasLocation': true,
-        'status': 'Telah diproses'
+        'status': 'Telah diproses',
+        'imageFile': null,
       },
       {
         'date': 'Sen, 21 Jul 2025',
         'time': '08:50',
         'hasLocation': true,
-        'status': 'Telah diproses'
+        'status': 'Telah diproses',
+        'imageFile': null,
       },
       {
         'date': 'Jul 15, 2025',
         'time': '18:04',
         'hasLocation': false,
-        'status': 'Offline'
+        'status': 'Offline',
+        'imageFile': null,
       },
       {
         'date': 'Jul 14, 2025',
         'time': '10:05',
         'hasLocation': false,
-        'status': 'Offline'
+        'status': 'Offline',
+        'imageFile': null,
       },
     ];
   }
@@ -90,6 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'time': _formatTime(now),
       'hasLocation': true,
       'status': 'Telah diproses',
+      'imageFile': _imageFile, // Tambahkan foto ke data
     };
 
     setState(() {
@@ -193,6 +199,10 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.arrow_forward_ios, color: Colors.black),
             onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.black),
+            onPressed: () => _showLogoutDialog(),
           ),
           IconButton(
             icon: const Icon(Icons.search, color: Colors.black),
@@ -312,7 +322,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             const Text('Jam Masuk',
                                 style: TextStyle(fontSize: 12)),
                             Text(
-                              _lastAttendanceTime != null && _isTimeIn
+                              _lastAttendanceTime != null &&
+                                      _isTimeIn &&
+                                      _imageFile != null
                                   ? _formatTime(_lastAttendanceTime!)
                                   : '--:--',
                               style:
@@ -376,7 +388,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             const Text('Jam Keluar',
                                 style: TextStyle(fontSize: 12)),
                             Text(
-                              _lastAttendanceTime != null && !_isTimeIn
+                              _lastAttendanceTime != null &&
+                                      !_isTimeIn &&
+                                      _imageFile != null
                                   ? _formatTime(_lastAttendanceTime!)
                                   : '--:--',
                               style:
@@ -416,7 +430,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: const Text(
                         'Rekam Waktu',
                         style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
+                            fontSize: 16, fontWeight: FontWeight.w500),
                       ),
                     ),
                   ),
@@ -454,6 +468,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             record['time'],
                             record['hasLocation'],
                             record['status'],
+                            record['imageFile'], // Pass foto ke widget
                           ))
                       .toList(),
                 ],
@@ -504,8 +519,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildAttendanceHistoryItem(
-      String date, String time, bool hasLocation, String status) {
+  Widget _buildAttendanceHistoryItem(String date, String time, bool hasLocation,
+      String status, File? imageFile) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -516,10 +531,39 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: Colors.grey[200],
-            child: const Icon(Icons.person, color: Colors.grey),
+          // Foto absensi dengan shadow
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.3),
+                  spreadRadius: 1,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: CircleAvatar(
+              radius: 20,
+              backgroundColor: Colors.grey[200],
+              child: imageFile != null
+                  ? ClipOval(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white, width: 1),
+                        ),
+                        child: Image.file(
+                          imageFile,
+                          fit: BoxFit.cover,
+                          width: 40,
+                          height: 40,
+                        ),
+                      ),
+                    )
+                  : const Icon(Icons.person, color: Colors.grey, size: 20),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -598,6 +642,61 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
         ],
       ),
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          title: const Text(
+            'Logout',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            'Apakah Anda yakin ingin keluar dari aplikasi?',
+            style: TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Batal',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _logout();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Logout',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _logout() {
+    // Navigate back to login screen
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      '/login',
+      (route) => false,
     );
   }
 }
