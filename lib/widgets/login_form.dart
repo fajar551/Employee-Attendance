@@ -22,7 +22,24 @@ class _LoginFormState extends State<LoginForm> {
   String? _errorMessage;
 
   @override
+  void initState() {
+    super.initState();
+
+    // Add listeners to update button color in real-time
+    _usernameController.addListener(_updateButtonColor);
+    _passwordController.addListener(_updateButtonColor);
+  }
+
+  void _updateButtonColor() {
+    setState(() {
+      // This will trigger rebuild and update button color
+    });
+  }
+
+  @override
   void dispose() {
+    _usernameController.removeListener(_updateButtonColor);
+    _passwordController.removeListener(_updateButtonColor);
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -199,7 +216,7 @@ class _LoginFormState extends State<LoginForm> {
                   text: const TextSpan(
                     style: TextStyle(fontSize: 14, color: Colors.black),
                     children: [
-                      TextSpan(text: 'Saya menyetujui dan menerima '),
+                      TextSpan(text: 'Saya menyetujui dan menerima kebijakan privasi'),
                     ],
                   ),
                 ),
@@ -233,8 +250,14 @@ class _LoginFormState extends State<LoginForm> {
             child: ElevatedButton(
               onPressed: _isLoading ? null : _login,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey[300],
-                foregroundColor: Colors.black,
+                backgroundColor: _usernameController.text.isNotEmpty &&
+                        _passwordController.text.isNotEmpty
+                    ? Colors.orange
+                    : Colors.grey[300],
+                foregroundColor: _usernameController.text.isNotEmpty &&
+                        _passwordController.text.isNotEmpty
+                    ? Colors.white
+                    : Colors.black,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
