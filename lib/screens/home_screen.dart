@@ -21,11 +21,45 @@ class _HomeScreenState extends State<HomeScreen> {
   final String _selectedFilter = 'All';
   DateTime? _lastAttendanceTime;
   final bool _isTimeIn = true; // true = jam masuk, false = jam keluar
+  List<Map<String, dynamic>> _attendanceHistory = [];
 
   @override
   void initState() {
     super.initState();
     _lastAttendanceTime = DateTime.now();
+    // Data dummy untuk riwayat absensi
+    _attendanceHistory = [
+      {
+        'date': 'Sel, 22 Jul 2025',
+        'time': '08:51',
+        'hasLocation': true,
+        'status': 'Telah diproses'
+      },
+      {
+        'date': 'Sen, 21 Jul 2025',
+        'time': '18:02',
+        'hasLocation': true,
+        'status': 'Telah diproses'
+      },
+      {
+        'date': 'Sen, 21 Jul 2025',
+        'time': '08:50',
+        'hasLocation': true,
+        'status': 'Telah diproses'
+      },
+      {
+        'date': 'Jul 15, 2025',
+        'time': '18:04',
+        'hasLocation': false,
+        'status': 'Offline'
+      },
+      {
+        'date': 'Jul 14, 2025',
+        'time': '10:05',
+        'hasLocation': false,
+        'status': 'Offline'
+      },
+    ];
   }
 
   Future<void> _pickImage() async {
@@ -36,6 +70,10 @@ class _HomeScreenState extends State<HomeScreen> {
         _imageFile = File(pickedFile.path);
         _lastAttendanceTime = DateTime.now();
       });
+
+      // Tambahkan data absensi baru ke riwayat
+      _addAttendanceRecord();
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(
@@ -43,6 +81,20 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       await _getLocation();
     }
+  }
+
+  void _addAttendanceRecord() {
+    final now = DateTime.now();
+    final newRecord = {
+      'date': _formatDate(now),
+      'time': _formatTime(now),
+      'hasLocation': true,
+      'status': 'Telah diproses',
+    };
+
+    setState(() {
+      _attendanceHistory.insert(0, newRecord); // Tambahkan di awal list
+    });
   }
 
   Future<void> _getLocation() async {
@@ -222,16 +274,39 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: Column(
                           children: [
-                            CircleAvatar(
-                              radius: 30,
-                              backgroundColor: Colors.grey[200],
-                              child: _imageFile != null && _isTimeIn
-                                  ? ClipOval(
-                                      child: Image.file(_imageFile!,
-                                          fit: BoxFit.cover),
-                                    )
-                                  : const Icon(Icons.person,
-                                      size: 30, color: Colors.grey),
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.3),
+                                    spreadRadius: 2,
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: CircleAvatar(
+                                radius: 30,
+                                backgroundColor: Colors.grey[200],
+                                child: _imageFile != null && _isTimeIn
+                                    ? ClipOval(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius:
+                                                BorderRadius.circular(30),
+                                            border: Border.all(
+                                                color: Colors.white, width: 2),
+                                          ),
+                                          child: Image.file(_imageFile!,
+                                              fit: BoxFit.cover,
+                                              width: 60,
+                                              height: 60),
+                                        ),
+                                      )
+                                    : const Icon(Icons.person,
+                                        size: 30, color: Colors.grey),
+                              ),
                             ),
                             const SizedBox(height: 8),
                             const Text('Jam Masuk',
@@ -262,17 +337,40 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: Column(
                           children: [
-                            CircleAvatar(
-                              radius: 30,
-                              backgroundColor: Colors.grey[200],
-                              child: _imageFile != null && !_isTimeIn
-                                  ? ClipOval(
-                                      child: Image.file(_imageFile!,
-                                          fit: BoxFit.cover),
-                                    )
-                                  : const Text('FH',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold)),
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.3),
+                                    spreadRadius: 2,
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: CircleAvatar(
+                                radius: 30,
+                                backgroundColor: Colors.grey[200],
+                                child: _imageFile != null && !_isTimeIn
+                                    ? ClipOval(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius:
+                                                BorderRadius.circular(30),
+                                            border: Border.all(
+                                                color: Colors.white, width: 2),
+                                          ),
+                                          child: Image.file(_imageFile!,
+                                              fit: BoxFit.cover,
+                                              width: 60,
+                                              height: 60),
+                                        ),
+                                      )
+                                    : const Text('FH',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                              ),
                             ),
                             const SizedBox(height: 8),
                             const Text('Jam Keluar',
@@ -350,16 +448,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 16),
 
                   // Attendance History List
-                  _buildAttendanceHistoryItem(
-                      'Sel, 22 Jul 2025', '08:51', true, 'Telah diproses'),
-                  _buildAttendanceHistoryItem(
-                      'Sen, 21 Jul 2025', '18:02', true, 'Telah diproses'),
-                  _buildAttendanceHistoryItem(
-                      'Sen, 21 Jul 2025', '08:50', true, 'Telah diproses'),
-                  _buildAttendanceHistoryItem(
-                      'Jul 15, 2025', '18:04', false, 'Offline'),
-                  _buildAttendanceHistoryItem(
-                      'Jul 14, 2025', '10:05', false, 'Offline'),
+                  ..._attendanceHistory
+                      .map((record) => _buildAttendanceHistoryItem(
+                            record['date'],
+                            record['time'],
+                            record['hasLocation'],
+                            record['status'],
+                          ))
+                      .toList(),
                 ],
               ),
             ),
