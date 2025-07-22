@@ -1,0 +1,507 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({Key? key}) : super(key: key);
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  File? _imageFile;
+  final ImagePicker _picker = ImagePicker();
+  Position? _position;
+  String? _locationError;
+  String? _address;
+  final String _selectedFilter = 'All';
+  DateTime? _lastAttendanceTime;
+  final bool _isTimeIn = true; // true = jam masuk, false = jam keluar
+
+  @override
+  void initState() {
+    super.initState();
+    _lastAttendanceTime = DateTime.now();
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? pickedFile =
+        await _picker.pickImage(source: ImageSource.camera);
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+        _lastAttendanceTime = DateTime.now();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                '${_isTimeIn ? "Jam Masuk" : "Jam Keluar"} berhasil direkam!')),
+      );
+      await _getLocation();
+    }
+  }
+
+  Future<void> _getLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          _locationError = 'Layanan lokasi tidak aktif';
+        });
+        return;
+      }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _locationError = 'Izin lokasi ditolak';
+          });
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _locationError = 'Izin lokasi ditolak permanen';
+        });
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition();
+      setState(() {
+        _position = pos;
+        _locationError = null;
+      });
+      await _getAddressFromCoordinates(pos);
+    } catch (e) {
+      setState(() {
+        _locationError = 'Gagal mendapatkan lokasi: $e';
+      });
+    }
+  }
+
+  Future<void> _getAddressFromCoordinates(Position position) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        setState(() {
+          _address =
+              '${place.street}, ${place.subLocality}, ${place.locality}, ${place.administrativeArea}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _address = 'Gagal mendapatkan alamat';
+      });
+    }
+  }
+
+  String _formatTime(DateTime time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatDate(DateTime date) {
+    List<String> months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Ags',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des'
+    ];
+    List<String> days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    return '${days[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          'PT Qwords Company Intern...',
+          style: TextStyle(color: Colors.black, fontSize: 16),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.arrow_forward_ios, color: Colors.black),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.search, color: Colors.black),
+            onPressed: () {},
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // User Profile Section
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: Colors.white,
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundColor: Colors.grey[300],
+                    child:
+                        const Icon(Icons.person, size: 30, color: Colors.grey),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Fajar Habib Zaelani',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Full Stack Developer',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.notifications, color: Colors.grey),
+                    onPressed: () {},
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Attendance Card
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 5,
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hari ini (${_formatDate(DateTime.now())})',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('Shift: Regular 1 [08:00 - 17:00]'),
+                  const SizedBox(height: 16),
+
+                  // Time In/Out Section
+                  Row(
+                    children: [
+                      // Time In
+                      Expanded(
+                        child: Column(
+                          children: [
+                            CircleAvatar(
+                              radius: 30,
+                              backgroundColor: Colors.grey[200],
+                              child: _imageFile != null && _isTimeIn
+                                  ? ClipOval(
+                                      child: Image.file(_imageFile!,
+                                          fit: BoxFit.cover),
+                                    )
+                                  : const Icon(Icons.person,
+                                      size: 30, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text('Jam Masuk',
+                                style: TextStyle(fontSize: 12)),
+                            Text(
+                              _lastAttendanceTime != null && _isTimeIn
+                                  ? _formatTime(_lastAttendanceTime!)
+                                  : '--:--',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.location_on,
+                                    size: 12, color: Colors.green[600]),
+                                const SizedBox(width: 4),
+                                const Text('Lokasi',
+                                    style: TextStyle(
+                                        fontSize: 10, color: Colors.grey)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Time Out
+                      Expanded(
+                        child: Column(
+                          children: [
+                            CircleAvatar(
+                              radius: 30,
+                              backgroundColor: Colors.grey[200],
+                              child: _imageFile != null && !_isTimeIn
+                                  ? ClipOval(
+                                      child: Image.file(_imageFile!,
+                                          fit: BoxFit.cover),
+                                    )
+                                  : const Text('FH',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold)),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text('Jam Keluar',
+                                style: TextStyle(fontSize: 12)),
+                            Text(
+                              _lastAttendanceTime != null && !_isTimeIn
+                                  ? _formatTime(_lastAttendanceTime!)
+                                  : '--:--',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.location_on,
+                                    size: 12, color: Colors.red[600]),
+                                const SizedBox(width: 4),
+                                const Text('Lokasi',
+                                    style: TextStyle(
+                                        fontSize: 10, color: Colors.grey)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Record Time Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _pickImage,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Rekam Waktu',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Attendance History
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Riwayat Absensi',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Filter Tabs
+                  Row(
+                    children: [
+                      _buildFilterTab('All', true),
+                      const SizedBox(width: 8),
+                      _buildFilterTab('Offline 3', false),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Attendance History List
+                  _buildAttendanceHistoryItem(
+                      'Sel, 22 Jul 2025', '08:51', true, 'Telah diproses'),
+                  _buildAttendanceHistoryItem(
+                      'Sen, 21 Jul 2025', '18:02', true, 'Telah diproses'),
+                  _buildAttendanceHistoryItem(
+                      'Sen, 21 Jul 2025', '08:50', true, 'Telah diproses'),
+                  _buildAttendanceHistoryItem(
+                      'Jul 15, 2025', '18:04', false, 'Offline'),
+                  _buildAttendanceHistoryItem(
+                      'Jul 14, 2025', '10:05', false, 'Offline'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 100), // Space for bottom navigation
+          ],
+        ),
+      ),
+      bottomNavigationBar: _buildBottomNavigation(),
+    );
+  }
+
+  Widget _buildFilterTab(String title, bool isSelected) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.orange[100] : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: isSelected ? Colors.orange[700] : Colors.grey[600],
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          if (title == 'Offline 3') ...[
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: const Text(
+                '3',
+                style: TextStyle(color: Colors.white, fontSize: 10),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendanceHistoryItem(
+      String date, String time, bool hasLocation, String status) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: Colors.grey[200],
+            child: const Icon(Icons.person, color: Colors.grey),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(date, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Row(
+                  children: [
+                    Text(time),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.location_on,
+                      size: 12,
+                      color: hasLocation ? Colors.green[600] : Colors.grey,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: status == 'Offline' ? Colors.red[100] : Colors.green[100],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (status == 'Offline')
+                  Icon(Icons.error, size: 12, color: Colors.red[600]),
+                const SizedBox(width: 4),
+                Text(
+                  status,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: status == 'Offline'
+                        ? Colors.red[600]
+                        : Colors.green[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigation() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 5,
+          ),
+        ],
+      ),
+      child: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        selectedItemColor: Colors.orange,
+        unselectedItemColor: Colors.grey,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Beranda'),
+          BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'Fitur'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.article), label: 'Postingan'),
+          BottomNavigationBarItem(icon: Icon(Icons.work), label: 'Ruang Kerja'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
+        ],
+      ),
+    );
+  }
+}
