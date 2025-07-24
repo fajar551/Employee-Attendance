@@ -919,7 +919,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Attendance Card
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 10),
+              margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -945,7 +945,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 4),
                   const Text('Shift: Regular 1 [08:00 - 17:00]',
                       style: TextStyle(fontSize: 13, color: Colors.grey)),
-                  const SizedBox(height: 16),
+                  // Tambahkan garis bawah setelah shift
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8, bottom: 8),
+                    child: Divider(
+                      height: 2,
+                      thickness: 2,
+                      color: Color(0xFFE0E0E0),
+                    ),
+                  ),
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.grey[50],
@@ -1001,6 +1009,13 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ],
                           ),
+                        ),
+                        // Garis vertikal di tengah
+                        Container(
+                          width: 2,
+                          height: 70,
+                          color: const Color(0xFFE0E0E0),
+                          margin: const EdgeInsets.symmetric(horizontal: 8),
                         ),
                         // Time Out
                         Expanded(
@@ -1058,12 +1073,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _pickImage,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: const Color(0xFFF18222),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        elevation: 0,
+                        elevation: 5, // bayangan di button rekam waktu
                       ),
                       child: _isLoading
                           ? Row(
@@ -1098,7 +1113,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   if (!_showHistorySection)
                     Padding(
-                      padding: const EdgeInsets.only(top: 12.0, bottom: 4.0),
+                      padding: const EdgeInsets.only(top: 4.0, bottom: 4.0),
                       child: Center(
                         child: TextButton(
                           onPressed: () {
@@ -1117,9 +1132,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               Text(
                                 'Lihat Detail',
                                 style: TextStyle(
-                                  color: Colors.orange,
+                                  color: const Color(0xFFF18222),
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                                  fontSize: 14,
                                 ),
                               ),
                               SizedBox(width: 4),
@@ -1182,7 +1197,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         else if (_attendanceHistory.isEmpty)
                           const Center(
                             child: Padding(
-                              padding: EdgeInsets.all(20.0),
+                              padding: EdgeInsets.all(5.0),
                               child: Text(
                                 'Belum ada riwayat absensi',
                                 style: TextStyle(color: Colors.grey),
@@ -1224,9 +1239,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   Text(
                                     'Sembunyikan Detail',
                                     style: TextStyle(
-                                      color: Colors.orange,
+                                      color: const Color(0xFFF18222),
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+                                      fontSize: 14,
                                     ),
                                   ),
                                   SizedBox(width: 4),
@@ -1538,7 +1553,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
-        selectedItemColor: Colors.orange,
+        selectedItemColor: const Color(0xFFF18222),
         unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Beranda'),
@@ -1582,7 +1597,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _logout();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
+                backgroundColor: const Color(0xFFF18222),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
