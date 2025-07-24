@@ -1,7 +1,9 @@
 import 'dart:convert'; // Added for base64Encode
 import 'dart:io';
 
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http; // Added for http
@@ -31,7 +33,42 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _lastAttendanceTime = DateTime.now();
+    _checkDeveloperMode();
     _loadAuthToken(); // Hanya load, tidak auto login
+  }
+
+  Future<void> _checkDeveloperMode() async {
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      final androidInfo = await deviceInfo.androidInfo;
+      const platform = MethodChannel('developer_mode_check');
+      final isDevMode =
+          await platform.invokeMethod<bool>('isDeveloperMode') ?? false;
+      if (isDevMode) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('Peringatan'),
+              content: const Text(
+                  'Tidak bisa absen karena Developer Mode/USB Debugging aktif. Silakan matikan Developer Mode.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.pushReplacementNamed(context, '/login');
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error checking developer mode: $e');
+    }
   }
 
   // Load token dari SharedPreferences atau storage lainnya
