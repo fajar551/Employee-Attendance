@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../screens/home_screen.dart';
 import '../services/auth_service.dart';
@@ -64,12 +68,37 @@ class _LoginFormState extends State<LoginForm> {
         _usernameController.text.trim(),
         _passwordController.text.trim(),
       );
-      // Jika login berhasil, redirect ke HomeScreen
-      if (context.mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      print('Login berhasil, token: $token');
+      if (token != null) {
+        final response = await http.get(
+          Uri.parse(
+              'https://absensi.qwords.com/backend/public/api/dashboardAndroid'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
         );
+        print('Response dashboardAndroid: ${response.body}');
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          print('User data: ${data['data']}');
+          if (data['data'] != null) {
+            await prefs.setString('user_data', jsonEncode(data['data']));
+            if (context.mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const HomeScreen()),
+              );
+            }
+            return;
+          }
+        }
+        setState(() {
+          _errorMessage = 'Login berhasil, tapi gagal mengambil data user.';
+        });
+        return;
       }
     } catch (e) {
       setState(() {
@@ -216,7 +245,9 @@ class _LoginFormState extends State<LoginForm> {
                   text: const TextSpan(
                     style: TextStyle(fontSize: 14, color: Colors.black),
                     children: [
-                      TextSpan(text: 'Saya menyetujui dan menerima kebijakan privasi'),
+                      TextSpan(
+                          text:
+                              'Saya menyetujui dan menerima kebijakan privasi'),
                     ],
                   ),
                 ),

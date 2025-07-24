@@ -11,7 +11,7 @@ class AuthService {
       // Simpan token ke SharedPreferences
       if (data['access_token'] != null) {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('access_token', data['access_token']);
+        await prefs.setString('auth_token', data['access_token']);
       }
       return;
     } else {

@@ -31,8 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _lastAttendanceTime = DateTime.now();
-    _loadAuthToken(); // Load token dari storage
-    _autoLogin(); // Auto login jika token tidak ada
+    _loadAuthToken(); // Hanya load, tidak auto login
   }
 
   // Load token dari SharedPreferences atau storage lainnya
@@ -43,6 +42,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Load data user juga
     await _loadUserData();
+    if (_authToken == null || _userData == null) {
+      // Redirect ke login jika tidak ada token/user
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    } else {
+      await _loadAttendanceHistory();
+      if (_userData == null) {
+        await _loadUserDataFromAPI();
+      }
+    }
   }
 
   // Function untuk menyimpan token ke SharedPreferences
@@ -141,34 +151,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Auto login jika token tidak ada
-  Future<void> _autoLogin() async {
-    await Future.delayed(const Duration(seconds: 2)); // Tunggu sebentar
-    if (_authToken == null || _authToken!.isEmpty) {
-      print('Debug: Auto login karena token kosong...');
-      bool success = await _loginAndGetToken("admin@gmail.com", "admin123");
-      if (success) {
-        print('Debug: Auto login berhasil');
-        // Load history setelah login berhasil
-        await _loadAttendanceHistory();
-        // Load user data jika belum ada
-        if (_userData == null) {
-          await _loadUserDataFromAPI();
-        }
-      } else {
-        print('Debug: Auto login gagal');
-      }
-    } else {
-      print('Debug: Token sudah ada, tidak perlu auto login');
-      // Load history jika token sudah ada
-      await _loadAttendanceHistory();
-      // Load user data jika belum ada
-      if (_userData == null) {
-        await _loadUserDataFromAPI();
-      }
-    }
-  }
-
   // Function untuk mengambil data history absensi dari API
   Future<void> _loadAttendanceHistory() async {
     if (_authToken == null || _authToken!.isEmpty) {
@@ -221,6 +203,9 @@ class _HomeScreenState extends State<HomeScreen> {
               'longitude': absensi['longitude'],
               'waktu_absen': absensi['waktu_absen'],
             });
+
+            // Debug print untuk foto
+            print('Debug: Foto URL: ${absensi['foto']}');
           }
         });
 
@@ -525,6 +510,36 @@ class _HomeScreenState extends State<HomeScreen> {
     return '${days[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
+  // Function untuk membuat inisial dari nama user
+  String _getUserInitials() {
+    if (_userData == null || _userData!['name'] == null) {
+      return 'U'; // Default jika tidak ada data user
+    }
+
+    String name = _userData!['name'].toString().trim();
+    if (name.isEmpty) {
+      return 'U';
+    }
+
+    List<String> nameParts = name.split(' ');
+    if (nameParts.length >= 2) {
+      // Ambil huruf pertama dari nama depan dan nama belakang
+      String firstInitial =
+          nameParts[0].isNotEmpty ? nameParts[0][0].toUpperCase() : '';
+      String lastInitial = nameParts[nameParts.length - 1].isNotEmpty
+          ? nameParts[nameParts.length - 1][0].toUpperCase()
+          : '';
+      return '$firstInitial$lastInitial';
+    } else if (nameParts.length == 1) {
+      // Jika hanya satu kata, ambil 2 huruf pertama
+      return name.length >= 2
+          ? name.substring(0, 2).toUpperCase()
+          : name.toUpperCase();
+    }
+
+    return 'U';
+  }
+
   // Function untuk mengambil data user dari API dashboard
   Future<void> _loadUserDataFromAPI() async {
     if (_authToken == null || _authToken!.isEmpty) {
@@ -696,8 +711,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                               height: 60),
                                         ),
                                       )
-                                    : const Icon(Icons.person,
-                                        size: 30, color: Colors.grey),
+                                    : Text(_getUserInitials(),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold)),
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -761,8 +777,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                               height: 60),
                                         ),
                                       )
-                                    : const Text('FH',
-                                        style: TextStyle(
+                                    : Text(_getUserInitials(),
+                                        style: const TextStyle(
                                             fontWeight: FontWeight.bold)),
                               ),
                             ),
@@ -905,16 +921,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     )
                   else
-                    ..._attendanceHistory
-                        .map((record) => _buildAttendanceHistoryItem(
-                              record['date'],
-                              record['time'],
-                              record['hasLocation'],
-                              record['status'],
-                              record['imageFile'], // Pass foto ke widget
-                              record['foto_url'], // Pass URL foto dari server
-                            ))
-                        .toList(),
+                    ..._attendanceHistory.map((record) {
+                      print(
+                          'Debug: Building history item with foto_url: ${record['foto_url']}');
+                      return _buildAttendanceHistoryItem(
+                        record['date'],
+                        record['time'],
+                        record['hasLocation'],
+                        record['status'],
+                        record['imageFile'], // Pass foto ke widget
+                        record['foto_url'], // Pass URL foto dari server
+                      );
+                    }).toList(),
                 ],
               ),
             ),
@@ -1014,18 +1032,55 @@ class _HomeScreenState extends State<HomeScreen> {
                               border: Border.all(color: Colors.white, width: 1),
                             ),
                             child: Image.network(
-                              'https://absensi.qwords.com/backend/public/storage/absensi/$fotoUrl',
+                              'https://absensi.qwords.com/backend/storage/app/public/absensi/$fotoUrl',
                               fit: BoxFit.cover,
                               width: 40,
                               height: 40,
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return SizedBox(
+                                  width: 40,
+                                  height: 40,
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      value:
+                                          loadingProgress.expectedTotalBytes !=
+                                                  null
+                                              ? loadingProgress
+                                                      .cumulativeBytesLoaded /
+                                                  loadingProgress
+                                                      .expectedTotalBytes!
+                                              : null,
+                                    ),
+                                  ),
+                                );
+                              },
                               errorBuilder: (context, error, stackTrace) {
-                                return const Icon(Icons.person,
-                                    color: Colors.grey, size: 20);
+                                print('Debug: Error loading image: $error');
+                                print(
+                                    'Debug: Attempted URL: https://absensi.qwords.com/backend/storage/app/public/absensi/$fotoUrl');
+                                return Text(
+                                  _getUserInitials(),
+                                  style: const TextStyle(
+                                    color: Colors.orange,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                );
                               },
                             ),
                           ),
                         )
-                      : const Icon(Icons.person, color: Colors.grey, size: 20),
+                      : Text(
+                          _getUserInitials(),
+                          style: const TextStyle(
+                            color: Colors.orange,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
             ),
           ),
           const SizedBox(width: 12),
@@ -1144,7 +1199,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               child: const Text(
-                'Logout',
+                'Keluar',
                 style: TextStyle(color: Colors.white),
               ),
             ),
