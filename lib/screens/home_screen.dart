@@ -21,7 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
   DateTime? _lastAttendanceTime;
-  final bool _isTimeIn = true; // true = jam masuk, false = jam keluar
+  int? _todayFlag; // null = belum absen, 1 = sudah masuk, 2 = sudah keluar
   List<Map<String, dynamic>> _attendanceHistory = [];
   String? _authToken; // Token untuk API
   Position? _currentPosition; // Posisi saat ini
@@ -35,6 +35,24 @@ class _HomeScreenState extends State<HomeScreen> {
     _lastAttendanceTime = DateTime.now();
     _checkDeveloperMode();
     _loadAuthToken(); // Hanya load, tidak auto login
+  }
+
+  void _updateTodayFlag() {
+    final today = DateTime.now().toString().substring(0, 10); // yyyy-MM-dd
+    final todayAbsensi = _attendanceHistory
+        .where((item) =>
+            item['waktu_absen'] != null &&
+            item['waktu_absen'].toString().startsWith(today))
+        .toList();
+
+    if (todayAbsensi.isEmpty) {
+      _todayFlag = null;
+    } else {
+      // Ambil flag terbesar hari ini (1 = masuk, 2 = keluar)
+      _todayFlag = todayAbsensi
+          .map((e) => e['flag'] ?? 1)
+          .fold(1, (prev, el) => el > prev ? el : prev);
+    }
   }
 
   Future<void> _checkDeveloperMode() async {
@@ -239,6 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
               'latitude': absensi['latitude'],
               'longitude': absensi['longitude'],
               'waktu_absen': absensi['waktu_absen'],
+              'flag': absensi['flag'] ?? 1,
             });
 
             // Debug print untuk foto
@@ -256,6 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _attendanceHistory = historyList;
         });
+        _updateTodayFlag();
 
         print(
             'Debug: History loaded successfully. Count: ${historyList.length}');
@@ -303,7 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
           scaffoldMessenger.showSnackBar(
             SnackBar(
               content: Text(
-                  '${_isTimeIn ? "Jam Masuk" : "Jam Keluar"} berhasil direkam!'),
+                  '${_todayFlag == null || _todayFlag == 2 ? "Jam Masuk" : "Jam Keluar"} berhasil direkam!'),
               backgroundColor: Colors.green,
             ),
           );
@@ -401,6 +421,7 @@ class _HomeScreenState extends State<HomeScreen> {
         'longitude': _currentPosition!.longitude,
         'foto': fotoBase64,
         'waktu_absen': waktuAbsen,
+        'flag': (_todayFlag == null || _todayFlag == 2) ? '1' : '2',
       };
 
       print('Debug: Sending data to API...');
@@ -411,7 +432,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Kirim request ke API
       final response = await http.post(
-        Uri.parse('https://absensi.qwords.com/backend/public/api/absensi'),
+        Uri.parse(
+            'https://absensi.qwords.com/backend/public/api/absensiAndroid'),
         headers: {
           'Authorization': 'Bearer $_authToken',
           'Content-Type': 'application/json',
@@ -618,6 +640,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isTimeIn = _todayFlag == null || _todayFlag == 2;
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -733,7 +756,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: CircleAvatar(
                                 radius: 30,
                                 backgroundColor: Colors.grey[200],
-                                child: _imageFile != null && _isTimeIn
+                                child: _imageFile != null && isTimeIn
                                     ? ClipOval(
                                         child: Container(
                                           decoration: BoxDecoration(
@@ -758,7 +781,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 style: TextStyle(fontSize: 12)),
                             Text(
                               _lastAttendanceTime != null &&
-                                      _isTimeIn &&
+                                      isTimeIn &&
                                       _imageFile != null
                                   ? _formatTime(_lastAttendanceTime!)
                                   : '--:--',
@@ -799,7 +822,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: CircleAvatar(
                                 radius: 30,
                                 backgroundColor: Colors.grey[200],
-                                child: _imageFile != null && !_isTimeIn
+                                child: _imageFile != null && !isTimeIn
                                     ? ClipOval(
                                         child: Container(
                                           decoration: BoxDecoration(
@@ -824,7 +847,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 style: TextStyle(fontSize: 12)),
                             Text(
                               _lastAttendanceTime != null &&
-                                      !_isTimeIn &&
+                                      !isTimeIn &&
                                       _imageFile != null
                                   ? _formatTime(_lastAttendanceTime!)
                                   : '--:--',

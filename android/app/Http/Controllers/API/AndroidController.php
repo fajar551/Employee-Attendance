@@ -15,7 +15,7 @@ class AndroidController extends Controller
     public function index()
     {
         $data = User::find(auth()->user()->id);
-        
+
         return response()->json([
             'data' => $data,
             'message' => 'Data Success'
@@ -45,7 +45,7 @@ class AndroidController extends Controller
                 $endDate->copy()->endOfDay()
             ])
             ->get()
-            ->groupBy(function($item) {
+            ->groupBy(function ($item) {
                 return \Carbon\Carbon::parse($item->waktu_absen)->format('l');
             });
 
@@ -73,19 +73,19 @@ class AndroidController extends Controller
             'longitude' => 'required|numeric',
             'foto' => 'required|string',
         ]);
-        
+
         if ($validator->fails()) {
             return response()->json($validator->errors(), 422);
         }
-        
+
         $data = $validator->validated();
-        
+
         $kantorLat = -6.881233;
         $kantorLng = 107.587617;
         $radius = 100; // meter
-        
+
         $jarak = $this->hitungJarak($kantorLat, $kantorLng, $data['latitude'], $data['longitude']);
-        
+
         if ($jarak > $radius) {
             return response()->json([
                 'message' => 'Anda di luar jangkauan kantor',
@@ -93,20 +93,35 @@ class AndroidController extends Controller
                 'radius' => $radius,
             ], 403);
         }
-        
+
+        // Cek absensi hari ini
+        $userId = auth()->user()->id;
+        $today = now()->format('Y-m-d');
+        $absensiToday = Absensi::where('user_id', $userId)
+            ->whereDate('waktu_absen', $today)
+            ->orderBy('waktu_absen')
+            ->get();
+
+        // Tentukan flag
+        $flag = 1;
+        if ($absensiToday->where('flag', 1)->count() > 0) {
+            $flag = 2;
+        }
+
         // Simpan foto
         $imageName = 'absensi_' . time() . '.png';
         $image = base64_decode(str_replace(' ', '+', str_replace('data:image/png;base64,', '', $data['foto'])));
         Storage::disk('public')->put("absensi/{$imageName}", $image);
-        
+
         $absensi = Absensi::create([
-            'user_id' => auth()->user()->id,
+            'user_id' => $userId,
             'latitude' => $data['latitude'],
             'longitude' => $data['longitude'],
             'foto' => $imageName,
+            'flag' => $flag,
             'waktu_absen' => now()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i:s'),
         ]);
-        
+
         return response()->json([
             'data' => $absensi,
             'message' => 'Absensi berhasil'
