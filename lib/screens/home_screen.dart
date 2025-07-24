@@ -25,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Position? _currentPosition; // Posisi saat ini
   bool _isLoading = false; // Loading state
   bool _isLoadingHistory = false; // Loading state untuk history
+  Map<String, dynamic>? _userData; // Data user dari login
 
   @override
   void initState() {
@@ -39,6 +40,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     _authToken = prefs.getString('auth_token');
     // Token akan diambil dari login yang sebenarnya, tidak di hardcode
+
+    // Load data user juga
+    await _loadUserData();
   }
 
   // Function untuk menyimpan token ke SharedPreferences
@@ -50,12 +54,39 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  // Function untuk menyimpan data user ke SharedPreferences
+  Future<void> _saveUserData(Map<String, dynamic> userData) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_data', jsonEncode(userData));
+    setState(() {
+      _userData = userData;
+    });
+  }
+
+  // Function untuk load data user dari SharedPreferences
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userDataString = prefs.getString('user_data');
+    if (userDataString != null) {
+      try {
+        final userData = jsonDecode(userDataString);
+        setState(() {
+          _userData = userData;
+        });
+      } catch (e) {
+        print('Debug: Error parsing user data: $e');
+      }
+    }
+  }
+
   // Function untuk clear token
   Future<void> _clearAuthToken() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+    await prefs.remove('user_data'); // Juga hapus data user
     setState(() {
       _authToken = null;
+      _userData = null;
     });
   }
 
@@ -87,6 +118,14 @@ class _HomeScreenState extends State<HomeScreen> {
           await _saveAuthToken(responseData['access_token']);
           print(
               'Debug: Access token saved successfully: ${responseData['access_token']}');
+
+          // Simpan data user jika ada
+          if (responseData['user'] != null) {
+            await _saveUserData(responseData['user']);
+            print(
+                'Debug: User data saved successfully: ${responseData['user']}');
+          }
+
           return true;
         } else {
           print('Debug: No access_token in response');
@@ -112,6 +151,10 @@ class _HomeScreenState extends State<HomeScreen> {
         print('Debug: Auto login berhasil');
         // Load history setelah login berhasil
         await _loadAttendanceHistory();
+        // Load user data jika belum ada
+        if (_userData == null) {
+          await _loadUserDataFromAPI();
+        }
       } else {
         print('Debug: Auto login gagal');
       }
@@ -119,6 +162,10 @@ class _HomeScreenState extends State<HomeScreen> {
       print('Debug: Token sudah ada, tidak perlu auto login');
       // Load history jika token sudah ada
       await _loadAttendanceHistory();
+      // Load user data jika belum ada
+      if (_userData == null) {
+        await _loadUserDataFromAPI();
+      }
     }
   }
 
@@ -478,6 +525,45 @@ class _HomeScreenState extends State<HomeScreen> {
     return '${days[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
+  // Function untuk mengambil data user dari API dashboard
+  Future<void> _loadUserDataFromAPI() async {
+    if (_authToken == null || _authToken!.isEmpty) {
+      print('Debug: Token tidak ada, tidak bisa load user data');
+      return;
+    }
+
+    try {
+      print('Debug: Loading user data from API...');
+
+      final response = await http.get(
+        Uri.parse(
+            'https://absensi.qwords.com/backend/public/api/dashboardAndroid'),
+        headers: {
+          'Authorization': 'Bearer $_authToken',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      print('Debug: User data response status: ${response.statusCode}');
+      print('Debug: User data response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final userData = responseData['data'];
+
+        if (userData != null) {
+          await _saveUserData(userData);
+          print('Debug: User data loaded successfully from API: $userData');
+        }
+      } else {
+        print(
+            'Debug: Failed to load user data. Status: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Debug: Error loading user data: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -523,15 +609,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         Text(
-                          'Fajar Habib Zaelani',
-                          style: TextStyle(
+                          _userData?['name'] ?? 'Loading...',
+                          style: const TextStyle(
                               fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          'Full Stack Developer',
-                          style: TextStyle(color: Colors.grey),
+                          _userData?['email'] ??
+                              _userData?['id'] ??
+                              'Loading...',
+                          style: const TextStyle(color: Colors.grey),
                         ),
                       ],
                     ),
