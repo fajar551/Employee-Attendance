@@ -1,9 +1,12 @@
+import 'dart:convert'; // Added for base64Encode
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http; // Added for http
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -18,11 +21,16 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime? _lastAttendanceTime;
   final bool _isTimeIn = true; // true = jam masuk, false = jam keluar
   List<Map<String, dynamic>> _attendanceHistory = [];
+  String? _authToken; // Token untuk API
+  Position? _currentPosition; // Posisi saat ini
+  bool _isLoading = false; // Loading state
 
   @override
   void initState() {
     super.initState();
     _lastAttendanceTime = DateTime.now();
+    _loadAuthToken(); // Load token dari storage
+    _autoLogin(); // Auto login jika token tidak ada
     // Data dummy untuk riwayat absensi
     _attendanceHistory = [
       {
@@ -63,26 +71,147 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
   }
 
-  Future<void> _pickImage() async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final XFile? pickedFile =
-        await _picker.pickImage(source: ImageSource.camera);
-    if (pickedFile != null) {
-      setState(() {
-        _imageFile = File(pickedFile.path);
-        _lastAttendanceTime = DateTime.now();
-      });
+  // Load token dari SharedPreferences atau storage lainnya
+  Future<void> _loadAuthToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    _authToken = prefs.getString('auth_token');
+    // Token akan diambil dari login yang sebenarnya, tidak di hardcode
+  }
 
-      // Tambahkan data absensi baru ke riwayat
-      _addAttendanceRecord();
+  // Function untuk menyimpan token ke SharedPreferences
+  Future<void> _saveAuthToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_token', token);
+    setState(() {
+      _authToken = token;
+    });
+  }
 
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-            content: Text(
-                '${_isTimeIn ? "Jam Masuk" : "Jam Keluar"} berhasil direkam!')),
+  // Function untuk clear token
+  Future<void> _clearAuthToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    setState(() {
+      _authToken = null;
+    });
+  }
+
+  // Function untuk login dan mendapatkan token
+  Future<bool> _loginAndGetToken(String email, String password) async {
+    try {
+      print('Debug: Attempting login with email: $email');
+
+      final response = await http.post(
+        Uri.parse('https://absensi.qwords.com/backend/public/api/login'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+        }),
       );
 
-      _getLocation(); // Remove await to avoid async gap
+      print('Debug: Login response status: ${response.statusCode}');
+      print('Debug: Login response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        print('Debug: Response data: $responseData');
+
+        // Cek field access_token (bukan token)
+        if (responseData['access_token'] != null) {
+          await _saveAuthToken(responseData['access_token']);
+          print(
+              'Debug: Access token saved successfully: ${responseData['access_token']}');
+          return true;
+        } else {
+          print('Debug: No access_token in response');
+          return false;
+        }
+      } else {
+        print('Debug: Login failed with status: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('Debug: Error saat login: $e');
+      return false;
+    }
+  }
+
+  // Auto login jika token tidak ada
+  Future<void> _autoLogin() async {
+    await Future.delayed(const Duration(seconds: 2)); // Tunggu sebentar
+    if (_authToken == null || _authToken!.isEmpty) {
+      print('Debug: Auto login karena token kosong...');
+      bool success = await _loginAndGetToken("admin@gmail.com", "admin123");
+      if (success) {
+        print('Debug: Auto login berhasil');
+      } else {
+        print('Debug: Auto login gagal');
+      }
+    } else {
+      print('Debug: Token sudah ada, tidak perlu auto login');
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    try {
+      // Set loading state
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Ambil foto dari kamera
+      final XFile? pickedFile =
+          await _picker.pickImage(source: ImageSource.camera);
+
+      if (pickedFile != null) {
+        setState(() {
+          _imageFile = File(pickedFile.path);
+          _lastAttendanceTime = DateTime.now();
+        });
+
+        // Ambil lokasi terlebih dahulu
+        await _getLocation();
+
+        // Kirim data ke API
+        bool success = await _sendAttendanceToAPI();
+
+        if (success) {
+          // Tambahkan data absensi baru ke riwayat
+          _addAttendanceRecord();
+
+          scaffoldMessenger.showSnackBar(
+            SnackBar(
+              content: Text(
+                  '${_isTimeIn ? "Jam Masuk" : "Jam Keluar"} berhasil direkam!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          scaffoldMessenger.showSnackBar(
+            const SnackBar(
+              content: Text('Gagal mengirim data absensi. Silakan coba lagi.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      // Reset loading state
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -118,6 +247,9 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
       final pos = await Geolocator.getCurrentPosition();
+      setState(() {
+        _currentPosition = pos;
+      });
       await _getAddressFromCoordinates(pos);
     } catch (e) {
       // Handle error silently or show snackbar if needed
@@ -135,6 +267,107 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       // Handle error silently
+    }
+  }
+
+  // Function untuk mengirim data absensi ke API
+  Future<bool> _sendAttendanceToAPI() async {
+    if (_authToken == null || _currentPosition == null || _imageFile == null) {
+      print(
+          'Debug: Token: $_authToken, Position: $_currentPosition, Image: $_imageFile');
+      return false;
+    }
+
+    try {
+      // Convert foto ke base64
+      List<int> imageBytes = await _imageFile!.readAsBytes();
+      String base64Image = base64Encode(imageBytes);
+      String fotoBase64 = "data:image/png;base64,$base64Image";
+
+      // Format waktu absen
+      String waktuAbsen = DateTime.now().toString().substring(0, 19);
+
+      // Data yang akan dikirim ke API
+      Map<String, dynamic> requestData = {
+        'latitude': _currentPosition!.latitude,
+        'longitude': _currentPosition!.longitude,
+        'foto': fotoBase64,
+        'waktu_absen': waktuAbsen,
+      };
+
+      print('Debug: Sending data to API...');
+      print('Debug: Latitude: ${_currentPosition!.latitude}');
+      print('Debug: Longitude: ${_currentPosition!.longitude}');
+      print('Debug: Waktu Absen: $waktuAbsen');
+      print('Debug: Foto length: ${fotoBase64.length}');
+
+      // Kirim request ke API
+      final response = await http.post(
+        Uri.parse('https://absensi.qwords.com/backend/public/api/absensi'),
+        headers: {
+          'Authorization': 'Bearer $_authToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(requestData),
+      );
+
+      print('Debug: Response status: ${response.statusCode}');
+      print('Debug: Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        // Berhasil
+        print('Absensi berhasil dikirim: ${response.body}');
+        return true;
+      } else {
+        // Gagal
+        print(
+            'Gagal mengirim absensi. Status: ${response.statusCode}, Response: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('Error saat mengirim absensi: $e');
+      return false;
+    }
+  }
+
+  // Function untuk test API tanpa foto
+  Future<bool> _testAPI() async {
+    try {
+      // Ambil lokasi terlebih dahulu
+      await _getLocation();
+
+      if (_currentPosition == null) {
+        print('Debug: Tidak bisa mendapatkan lokasi');
+        return false;
+      }
+
+      // Data test tanpa foto
+      Map<String, dynamic> testData = {
+        'latitude': _currentPosition!.latitude,
+        'longitude': _currentPosition!.longitude,
+        'foto':
+            'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', // 1x1 pixel transparent PNG
+        'waktu_absen': DateTime.now().toString().substring(0, 19),
+      };
+
+      print('Debug: Testing API with data: $testData');
+
+      final response = await http.post(
+        Uri.parse('https://absensi.qwords.com/backend/public/api/absensi'),
+        headers: {
+          'Authorization': 'Bearer $_authToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(testData),
+      );
+
+      print('Debug: Test response status: ${response.statusCode}');
+      print('Debug: Test response body: ${response.body}');
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Debug: Test API error: $e');
+      return false;
     }
   }
 
@@ -396,7 +629,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _pickImage,
+                      onPressed: _isLoading ? null : _pickImage,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange,
                         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -404,10 +637,142 @@ class _HomeScreenState extends State<HomeScreen> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
+                      child: _isLoading
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: const [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white),
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Mengirim...',
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            )
+                          : const Text(
+                              'Rekam Waktu',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w500),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Test API Button (untuk debugging)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () async {
+                              setState(() {
+                                _isLoading = true;
+                              });
+
+                              bool success = await _testAPI();
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(success
+                                      ? 'Test API berhasil!'
+                                      : 'Test API gagal!'),
+                                  backgroundColor:
+                                      success ? Colors.green : Colors.red,
+                                ),
+                              );
+
+                              setState(() {
+                                _isLoading = false;
+                              });
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                       child: const Text(
-                        'Rekam Waktu',
+                        'Test API',
                         style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w500),
+                            fontSize: 14, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Test Login Button (untuk debugging)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : () async {
+                        setState(() {
+                          _isLoading = true;
+                        });
+                        
+                        bool success = await _loginAndGetToken("admin@gmail.com", "admin123");
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(success ? 'Login berhasil! Token: $_authToken' : 'Login gagal!'),
+                            backgroundColor: success ? Colors.green : Colors.red,
+                          ),
+                        );
+                        
+                        setState(() {
+                          _isLoading = false;
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Test Login',
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // Clear Token Button (untuk debugging)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : () async {
+                        await _clearAuthToken();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Token berhasil dihapus!'),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Clear Token',
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w500),
                       ),
                     ),
                   ),
@@ -669,6 +1034,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _logout() {
+    _clearAuthToken(); // Clear token sebelum keluar
     // Navigate back to login screen
     Navigator.pushNamedAndRemoveUntil(
       context,
