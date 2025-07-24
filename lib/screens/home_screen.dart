@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_exif_rotation/flutter_exif_rotation.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http; // Added for http
@@ -31,6 +32,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = false; // Loading state
   bool _isLoadingHistory = false; // Loading state untuk history
   Map<String, dynamic>? _userData; // Data user dari login
+  final bool _showAllHistory = false;
+  bool _showHistorySection = true;
 
   @override
   void initState() {
@@ -363,8 +366,11 @@ class _HomeScreenState extends State<HomeScreen> {
           await _picker.pickImage(source: ImageSource.camera);
 
       if (pickedFile != null) {
+        // Fix rotasi foto jika perlu
+        final File fixedImage =
+            await FlutterExifRotation.rotateImage(path: pickedFile.path);
         setState(() {
-          _imageFile = File(pickedFile.path);
+          _imageFile = fixedImage;
           _lastAttendanceTime = DateTime.now();
         });
 
@@ -397,7 +403,7 @@ class _HomeScreenState extends State<HomeScreen> {
               absensiKeluar['waktu_absen'] != null &&
               absensiKeluar['foto_url'] != null) {
             // Baru saja absen keluar
-            await _saveAttendancePhoto(false, pickedFile.path);
+            await _saveAttendancePhoto(false, fixedImage.path);
             scaffoldMessenger.showSnackBar(
               const SnackBar(
                 content: Text('Jam Keluar berhasil direkam!'),
@@ -408,7 +414,7 @@ class _HomeScreenState extends State<HomeScreen> {
               absensiMasuk['waktu_absen'] != null &&
               absensiMasuk['foto_url'] != null) {
             // Baru saja absen masuk
-            await _saveAttendancePhoto(true, pickedFile.path);
+            await _saveAttendancePhoto(true, fixedImage.path);
             scaffoldMessenger.showSnackBar(
               const SnackBar(
                 content: Text('Jam Masuk berhasil direkam!'),
@@ -913,16 +919,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Attendance Card
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.symmetric(horizontal: 10),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200, width: 1),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.black.withOpacity(0.13), // abu-abu transparan
+                    blurRadius: 32,
                     spreadRadius: 1,
-                    blurRadius: 5,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
@@ -931,120 +939,131 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     'Hari ini (${_formatDate(DateTime.now())})',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16),
                   ),
-                  const SizedBox(height: 8),
-                  const Text('Shift: Regular 1 [08:00 - 17:00]'),
+                  const SizedBox(height: 4),
+                  const Text('Shift: Regular 1 [08:00 - 17:00]',
+                      style: TextStyle(fontSize: 13, color: Colors.grey)),
                   const SizedBox(height: 16),
-
-                  // Time In/Out Section
-                  Row(
-                    children: [
-                      // Time In
-                      Expanded(
-                        child: Column(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.grey.withOpacity(0.3),
-                                    spreadRadius: 2,
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
-                                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                    child: Row(
+                      children: [
+                        // Time In
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.green.withOpacity(0.10),
+                                      spreadRadius: 2,
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: CircleAvatar(
+                                  radius: 30,
+                                  backgroundColor: Colors.green[50],
+                                  child: jamMasukFoto,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text('Jam Masuk',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.black87)),
+                              Text(
+                                jamMasukWaktu,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.green),
+                              ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.location_on,
+                                      size: 12, color: Colors.green[600]),
+                                  const SizedBox(width: 4),
+                                  const Text('Lokasi',
+                                      style: TextStyle(
+                                          fontSize: 10, color: Colors.grey)),
                                 ],
                               ),
-                              child: CircleAvatar(
-                                radius: 30,
-                                backgroundColor: Colors.grey[200],
-                                child: jamMasukFoto,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text('Jam Masuk',
-                                style: TextStyle(fontSize: 12)),
-                            Text(
-                              jamMasukWaktu,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.location_on,
-                                    size: 12, color: Colors.green[600]),
-                                const SizedBox(width: 4),
-                                const Text('Lokasi',
-                                    style: TextStyle(
-                                        fontSize: 10, color: Colors.grey)),
-                              ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-
-                      // Time Out
-                      Expanded(
-                        child: Column(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.grey.withOpacity(0.3),
-                                    spreadRadius: 2,
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
-                                  ),
+                        // Time Out
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.red.withOpacity(0.10),
+                                      spreadRadius: 2,
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: CircleAvatar(
+                                  radius: 30,
+                                  backgroundColor: Colors.red[50],
+                                  child: jamKeluarFoto,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text('Jam Keluar',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.black87)),
+                              Text(
+                                jamKeluarWaktu,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.red),
+                              ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.location_on,
+                                      size: 12, color: Colors.red[600]),
+                                  const SizedBox(width: 4),
+                                  const Text('Lokasi',
+                                      style: TextStyle(
+                                          fontSize: 10, color: Colors.grey)),
                                 ],
                               ),
-                              child: CircleAvatar(
-                                radius: 30,
-                                backgroundColor: Colors.grey[200],
-                                child: jamKeluarFoto,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text('Jam Keluar',
-                                style: TextStyle(fontSize: 12)),
-                            Text(
-                              jamKeluarWaktu,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.location_on,
-                                    size: 12, color: Colors.red[600]),
-                                const SizedBox(width: 4),
-                                const Text('Lokasi',
-                                    style: TextStyle(
-                                        fontSize: 10, color: Colors.grey)),
-                              ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-
                   const SizedBox(height: 16),
-
-                  // Record Time Button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _pickImage,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
+                        elevation: 0,
                       ),
                       child: _isLoading
                           ? Row(
@@ -1077,84 +1096,233 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                     ),
                   ),
+                  if (!_showHistorySection)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12.0, bottom: 4.0),
+                      child: Center(
+                        child: TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _showHistorySection = true;
+                            });
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.orange,
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 0, horizontal: 24),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Text(
+                                'Lihat Detail',
+                                style: TextStyle(
+                                  color: Colors.orange,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              SizedBox(width: 4),
+                              Icon(
+                                Icons.expand_more,
+                                color: Colors.orange,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (_showHistorySection) ...[
+                    const Divider(
+                        height: 28, thickness: 1, color: Color(0xFFF2F2F2)),
+                    // Riwayat Absensi
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Riwayat Absensi',
+                              style: TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            // Refresh button
+                            IconButton(
+                              onPressed: _isLoadingHistory
+                                  ? null
+                                  : _loadAttendanceHistory,
+                              icon: _isLoadingHistory
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.refresh),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            _buildFilterTab('All', true),
+                            const SizedBox(width: 8),
+                            _buildFilterTab('Offline 3', false),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        if (_isLoadingHistory)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        else if (_attendanceHistory.isEmpty)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: Text(
+                                'Belum ada riwayat absensi',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ),
+                          )
+                        else ...[
+                          ...(_showAllHistory
+                                  ? _attendanceHistory
+                                  : _attendanceHistory.take(5).toList())
+                              .map((record) {
+                            print(
+                                'Debug: Building history item with foto_url:  [32m${record['foto_url']} [0m');
+                            return _buildAttendanceHistoryItem(
+                              record['date'],
+                              record['time'],
+                              record['hasLocation'],
+                              record['status'],
+                              record['imageFile'],
+                              record['foto_url'],
+                            );
+                          }).toList(),
+                          const SizedBox(height: 8),
+                          Center(
+                            child: TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _showHistorySection = false;
+                                });
+                              },
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.orange,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 0, horizontal: 24),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Text(
+                                    'Sembunyikan Detail',
+                                    style: TextStyle(
+                                      color: Colors.orange,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(
+                                    Icons.expand_less,
+                                    color: Colors.orange,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-
-            // Attendance History
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // Menu Favorit Card
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: Colors.grey.shade200, width: 1),
+                ),
+                color: Colors.white,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Riwayat Absensi',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      // Refresh button
-                      IconButton(
-                        onPressed:
-                            _isLoadingHistory ? null : _loadAttendanceHistory,
-                        icon: _isLoadingHistory
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.refresh),
+                      const Text('Menu Favorit',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildFavoriteMenuItem(
+                              Icons.receipt_long, 'Slip Gaji Saya', [
+                            const Color(0xFFFEF6E0),
+                            const Color(0xFFFFE0B2)
+                          ]),
+                          _buildFavoriteMenuItem(
+                              Icons.event_note, 'Aktivitas Harian', [
+                            const Color(0xFFE0F7FA),
+                            const Color(0xFFB2EBF2)
+                          ]),
+                          _buildFavoriteMenuItem(
+                              Icons.chat_bubble_outline, 'Obrolan', [
+                            const Color(0xFFEDE7F6),
+                            const Color(0xFFD1C4E9)
+                          ]),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-
-                  // Filter Tabs
-                  Row(
+                ),
+              ),
+            ),
+            // Info Perusahaan Card
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: Colors.grey.shade200, width: 1),
+                ),
+                color: Colors.white,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildFilterTab('All', true),
-                      const SizedBox(width: 8),
-                      _buildFilterTab('Offline 3', false),
+                      const Text('Informasi Perusahaan',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 12),
+                      Center(
+                        child: Icon(Icons.insert_drive_file,
+                            size: 48, color: Colors.grey[300]),
+                      ),
+                      const SizedBox(height: 8),
+                      const Center(
+                        child: Text('Belum ada informasi',
+                            style: TextStyle(color: Colors.grey)),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-
-                  // Attendance History List
-                  if (_isLoadingHistory)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(20.0),
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  else if (_attendanceHistory.isEmpty)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(20.0),
-                        child: Text(
-                          'Belum ada riwayat absensi',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
-                    )
-                  else
-                    ..._attendanceHistory.map((record) {
-                      print(
-                          'Debug: Building history item with foto_url: ${record['foto_url']}');
-                      return _buildAttendanceHistoryItem(
-                        record['date'],
-                        record['time'],
-                        record['hasLocation'],
-                        record['status'],
-                        record['imageFile'], // Pass foto ke widget
-                        record['foto_url'], // Pass URL foto dari server
-                      );
-                    }).toList(),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 100), // Space for bottom navigation
@@ -1437,6 +1605,29 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       '/login',
       (route) => false,
+    );
+  }
+
+  Widget _buildFavoriteMenuItem(
+      IconData icon, String label, List<Color> gradientColors) {
+    return Column(
+      children: [
+        Container(
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: gradientColors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Icon(icon, color: Colors.deepOrange, size: 28),
+        ),
+        const SizedBox(height: 6),
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
     );
   }
 }
