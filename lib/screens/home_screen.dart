@@ -24,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _authToken; // Token untuk API
   Position? _currentPosition; // Posisi saat ini
   bool _isLoading = false; // Loading state
+  bool _isLoadingHistory = false; // Loading state untuk history
 
   @override
   void initState() {
@@ -31,44 +32,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _lastAttendanceTime = DateTime.now();
     _loadAuthToken(); // Load token dari storage
     _autoLogin(); // Auto login jika token tidak ada
-    // Data dummy untuk riwayat absensi
-    _attendanceHistory = [
-      {
-        'date': 'Sel, 22 Jul 2025',
-        'time': '08:51',
-        'hasLocation': true,
-        'status': 'Telah diproses',
-        'imageFile': null, // Data lama tidak punya foto
-      },
-      {
-        'date': 'Sen, 21 Jul 2025',
-        'time': '18:02',
-        'hasLocation': true,
-        'status': 'Telah diproses',
-        'imageFile': null,
-      },
-      {
-        'date': 'Sen, 21 Jul 2025',
-        'time': '08:50',
-        'hasLocation': true,
-        'status': 'Telah diproses',
-        'imageFile': null,
-      },
-      {
-        'date': 'Jul 15, 2025',
-        'time': '18:04',
-        'hasLocation': false,
-        'status': 'Offline',
-        'imageFile': null,
-      },
-      {
-        'date': 'Jul 14, 2025',
-        'time': '10:05',
-        'hasLocation': false,
-        'status': 'Offline',
-        'imageFile': null,
-      },
-    ];
   }
 
   // Load token dari SharedPreferences atau storage lainnya
@@ -147,11 +110,95 @@ class _HomeScreenState extends State<HomeScreen> {
       bool success = await _loginAndGetToken("admin@gmail.com", "admin123");
       if (success) {
         print('Debug: Auto login berhasil');
+        // Load history setelah login berhasil
+        await _loadAttendanceHistory();
       } else {
         print('Debug: Auto login gagal');
       }
     } else {
       print('Debug: Token sudah ada, tidak perlu auto login');
+      // Load history jika token sudah ada
+      await _loadAttendanceHistory();
+    }
+  }
+
+  // Function untuk mengambil data history absensi dari API
+  Future<void> _loadAttendanceHistory() async {
+    if (_authToken == null || _authToken!.isEmpty) {
+      print('Debug: Token tidak ada, tidak bisa load history');
+      return;
+    }
+
+    setState(() {
+      _isLoadingHistory = true;
+    });
+
+    try {
+      print('Debug: Loading attendance history...');
+
+      final response = await http.get(
+        Uri.parse(
+            'https://absensi.qwords.com/backend/public/api/getAbsensiHistoryAndroid'),
+        headers: {
+          'Authorization': 'Bearer $_authToken',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      print('Debug: History response status: ${response.statusCode}');
+      print('Debug: History response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final data = responseData['data'];
+
+        // Convert API data ke format yang sesuai dengan UI
+        List<Map<String, dynamic>> historyList = [];
+
+        // Iterate through each day
+        data.forEach((dayName, dayData) {
+          final absensiList = dayData['absensi'] as List;
+
+          // Convert each attendance record
+          for (var absensi in absensiList) {
+            final waktuAbsen = DateTime.parse(absensi['waktu_absen']);
+
+            historyList.add({
+              'date': _formatDate(waktuAbsen),
+              'time': _formatTime(waktuAbsen),
+              'hasLocation': true, // Semua data dari API memiliki lokasi
+              'status': 'Telah diproses',
+              'imageFile': null, // Foto disimpan di server, tidak di local
+              'foto_url': absensi['foto'], // URL foto dari server
+              'latitude': absensi['latitude'],
+              'longitude': absensi['longitude'],
+              'waktu_absen': absensi['waktu_absen'],
+            });
+          }
+        });
+
+        // Sort by date (newest first)
+        historyList.sort((a, b) {
+          final dateA = DateTime.parse(a['waktu_absen']);
+          final dateB = DateTime.parse(b['waktu_absen']);
+          return dateB.compareTo(dateA);
+        });
+
+        setState(() {
+          _attendanceHistory = historyList;
+        });
+
+        print(
+            'Debug: History loaded successfully. Count: ${historyList.length}');
+      } else {
+        print('Debug: Failed to load history. Status: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Debug: Error loading history: $e');
+    } finally {
+      setState(() {
+        _isLoadingHistory = false;
+      });
     }
   }
 
@@ -181,8 +228,8 @@ class _HomeScreenState extends State<HomeScreen> {
         bool success = await _sendAttendanceToAPI();
 
         if (success) {
-          // Tambahkan data absensi baru ke riwayat
-          _addAttendanceRecord();
+          // Reload history setelah absensi berhasil
+          await _loadAttendanceHistory();
 
           scaffoldMessenger.showSnackBar(
             SnackBar(
@@ -191,20 +238,27 @@ class _HomeScreenState extends State<HomeScreen> {
               backgroundColor: Colors.green,
             ),
           );
-        } else {
-          scaffoldMessenger.showSnackBar(
-            const SnackBar(
-              content: Text('Gagal mengirim data absensi. Silakan coba lagi.'),
-              backgroundColor: Colors.red,
-            ),
-          );
         }
       }
     } catch (e) {
+      // Tampilkan pesan error yang spesifik
+      String errorMessage = 'Terjadi kesalahan saat absensi';
+
+      if (e.toString().contains('diluar jangkauan') ||
+          e.toString().contains('jangkauan kantor')) {
+        errorMessage = e.toString().replaceAll('Exception: ', '');
+      } else if (e.toString().contains('Gagal mengirim data absensi')) {
+        errorMessage = e.toString().replaceAll('Exception: ', '');
+      } else {
+        errorMessage = 'Terjadi kesalahan: ${e.toString()}';
+      }
+
       scaffoldMessenger.showSnackBar(
         SnackBar(
-          content: Text('Error: ${e.toString()}'),
+          content: Text(errorMessage),
           backgroundColor: Colors.red,
+          duration: const Duration(
+              seconds: 5), // Tampilkan lebih lama untuk pesan error
         ),
       );
     } finally {
@@ -213,21 +267,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
       });
     }
-  }
-
-  void _addAttendanceRecord() {
-    final now = DateTime.now();
-    final newRecord = {
-      'date': _formatDate(now),
-      'time': _formatTime(now),
-      'hasLocation': true,
-      'status': 'Telah diproses',
-      'imageFile': _imageFile, // Tambahkan foto ke data
-    };
-
-    setState(() {
-      _attendanceHistory.insert(0, newRecord); // Tambahkan di awal list
-    });
   }
 
   Future<void> _getLocation() async {
@@ -318,58 +357,103 @@ class _HomeScreenState extends State<HomeScreen> {
         // Berhasil
         print('Absensi berhasil dikirim: ${response.body}');
         return true;
+      } else if (response.statusCode == 403) {
+        // Gagal karena diluar jangkauan
+        try {
+          final errorData = jsonDecode(response.body);
+          final message =
+              errorData['message'] ?? 'Anda berada di luar jangkauan kantor';
+          final jarak = errorData['jarak']?.toString() ?? '';
+          final radius = errorData['radius']?.toString() ?? '';
+
+          // Throw exception dengan pesan yang spesifik
+          throw Exception('$message\nJarak: ${jarak}m, Radius: ${radius}m');
+        } catch (e) {
+          throw Exception('Anda berada di luar jangkauan kantor');
+        }
       } else {
-        // Gagal
-        print(
-            'Gagal mengirim absensi. Status: ${response.statusCode}, Response: ${response.body}');
-        return false;
+        // Gagal karena alasan lain
+        try {
+          final errorData = jsonDecode(response.body);
+          final message = errorData['message'] ?? 'Gagal mengirim data absensi';
+          throw Exception(message);
+        } catch (e) {
+          throw Exception(
+              'Gagal mengirim data absensi. Status: ${response.statusCode}');
+        }
       }
     } catch (e) {
       print('Error saat mengirim absensi: $e');
-      return false;
+      // Re-throw exception agar bisa ditangkap di _pickImage
+      rethrow;
     }
   }
 
   // Function untuk test API tanpa foto
-  Future<bool> _testAPI() async {
-    try {
-      // Ambil lokasi terlebih dahulu
-      await _getLocation();
+  // Future<bool> _testAPI() async {
+  //   try {
+  //     // Ambil lokasi terlebih dahulu
+  //     await _getLocation();
 
-      if (_currentPosition == null) {
-        print('Debug: Tidak bisa mendapatkan lokasi');
-        return false;
-      }
+  //     if (_currentPosition == null) {
+  //       print('Debug: Tidak bisa mendapatkan lokasi');
+  //       return false;
+  //     }
 
-      // Data test tanpa foto
-      Map<String, dynamic> testData = {
-        'latitude': _currentPosition!.latitude,
-        'longitude': _currentPosition!.longitude,
-        'foto':
-            'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', // 1x1 pixel transparent PNG
-        'waktu_absen': DateTime.now().toString().substring(0, 19),
-      };
+  //     // Data test tanpa foto
+  //     Map<String, dynamic> testData = {
+  //       'latitude': _currentPosition!.latitude,
+  //       'longitude': _currentPosition!.longitude,
+  //       'foto':
+  //           'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', // 1x1 pixel transparent PNG
+  //       'waktu_absen': DateTime.now().toString().substring(0, 19),
+  //     };
 
-      print('Debug: Testing API with data: $testData');
+  //     print('Debug: Testing API with data: $testData');
 
-      final response = await http.post(
-        Uri.parse('https://absensi.qwords.com/backend/public/api/absensi'),
-        headers: {
-          'Authorization': 'Bearer $_authToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(testData),
-      );
+  //     final response = await http.post(
+  //       Uri.parse('https://absensi.qwords.com/backend/public/api/absensi'),
+  //       headers: {
+  //         'Authorization': 'Bearer $_authToken',
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: jsonEncode(testData),
+  //     );
 
-      print('Debug: Test response status: ${response.statusCode}');
-      print('Debug: Test response body: ${response.body}');
+  //     print('Debug: Test response status: ${response.statusCode}');
+  //     print('Debug: Test response body: ${response.body}');
 
-      return response.statusCode == 200;
-    } catch (e) {
-      print('Debug: Test API error: $e');
-      return false;
-    }
-  }
+  //     if (response.statusCode == 200) {
+  //       return true;
+  //     } else if (response.statusCode == 403) {
+  //       // Gagal karena diluar jangkauan
+  //       try {
+  //         final errorData = jsonDecode(response.body);
+  //         final message = errorData['message'] ?? 'Anda berada di luar jangkauan kantor';
+  //         final jarak = errorData['jarak']?.toString() ?? '';
+  //         final radius = errorData['radius']?.toString() ?? '';
+
+  //         print('Debug: Test API failed - $message (Jarak: ${jarak}m, Radius: ${radius}m)');
+  //       } catch (e) {
+  //         print('Debug: Test API failed - Anda berada di luar jangkauan kantor');
+  //       }
+  //       return false;
+  //     } else {
+  //       // Gagal karena alasan lain
+  //       try {
+  //         final errorData = jsonDecode(response.body);
+  //         final message = errorData['message'] ?? 'Gagal test API';
+  //         print('Debug: Test API failed - $message');
+  //       } catch (e) {
+  //         print('Debug: Test API failed - Status: ${response.statusCode}');
+  //       }
+  //       return false;
+  //     }
+  //   } catch (e) {
+  //     print('Debug: Test API error: $e');
+  //     return false;
+  //   }
+  // }
 
   String _formatTime(DateTime time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
@@ -662,118 +746,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           : const Text(
                               'Rekam Waktu',
                               style: TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.w500),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color.fromARGB(255, 255, 255, 255)),
                             ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Test API Button (untuk debugging)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () async {
-                              setState(() {
-                                _isLoading = true;
-                              });
-
-                              bool success = await _testAPI();
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(success
-                                      ? 'Test API berhasil!'
-                                      : 'Test API gagal!'),
-                                  backgroundColor:
-                                      success ? Colors.green : Colors.red,
-                                ),
-                              );
-
-                              setState(() {
-                                _isLoading = false;
-                              });
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        'Test API',
-                        style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Test Login Button (untuk debugging)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : () async {
-                        setState(() {
-                          _isLoading = true;
-                        });
-                        
-                        bool success = await _loginAndGetToken("admin@gmail.com", "admin123");
-                        
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(success ? 'Login berhasil! Token: $_authToken' : 'Login gagal!'),
-                            backgroundColor: success ? Colors.green : Colors.red,
-                          ),
-                        );
-                        
-                        setState(() {
-                          _isLoading = false;
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        'Test Login',
-                        style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  
-                  // Clear Token Button (untuk debugging)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : () async {
-                        await _clearAuthToken();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Token berhasil dihapus!'),
-                            backgroundColor: Colors.orange,
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        'Clear Token',
-                        style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w500),
-                      ),
                     ),
                   ),
                 ],
@@ -787,9 +763,28 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Riwayat Absensi',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Riwayat Absensi',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      // Refresh button
+                      IconButton(
+                        onPressed:
+                            _isLoadingHistory ? null : _loadAttendanceHistory,
+                        icon: _isLoadingHistory
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.refresh),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
 
@@ -804,15 +799,34 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 16),
 
                   // Attendance History List
-                  ..._attendanceHistory
-                      .map((record) => _buildAttendanceHistoryItem(
-                            record['date'],
-                            record['time'],
-                            record['hasLocation'],
-                            record['status'],
-                            record['imageFile'], // Pass foto ke widget
-                          ))
-                      .toList(),
+                  if (_isLoadingHistory)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else if (_attendanceHistory.isEmpty)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20.0),
+                        child: Text(
+                          'Belum ada riwayat absensi',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    )
+                  else
+                    ..._attendanceHistory
+                        .map((record) => _buildAttendanceHistoryItem(
+                              record['date'],
+                              record['time'],
+                              record['hasLocation'],
+                              record['status'],
+                              record['imageFile'], // Pass foto ke widget
+                              record['foto_url'], // Pass URL foto dari server
+                            ))
+                        .toList(),
                 ],
               ),
             ),
@@ -862,7 +876,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildAttendanceHistoryItem(String date, String time, bool hasLocation,
-      String status, File? imageFile) {
+      String status, File? imageFile, String? fotoUrl) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -904,7 +918,26 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     )
-                  : const Icon(Icons.person, color: Colors.grey, size: 20),
+                  : fotoUrl != null
+                      ? ClipOval(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.white, width: 1),
+                            ),
+                            child: Image.network(
+                              'https://absensi.qwords.com/backend/public/storage/absensi/$fotoUrl',
+                              fit: BoxFit.cover,
+                              width: 40,
+                              height: 40,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(Icons.person,
+                                    color: Colors.grey, size: 20);
+                              },
+                            ),
+                          ),
+                        )
+                      : const Icon(Icons.person, color: Colors.grey, size: 20),
             ),
           ),
           const SizedBox(width: 12),
