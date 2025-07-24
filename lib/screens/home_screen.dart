@@ -19,6 +19,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   File? _imageFile;
+  File? _jamMasukFile;
+  File? _jamKeluarFile;
+  String? _tanggalAbsenTerakhir;
   final ImagePicker _picker = ImagePicker();
   DateTime? _lastAttendanceTime;
   int? _todayFlag; // null = belum absen, 1 = sudah masuk, 2 = sudah keluar
@@ -34,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _lastAttendanceTime = DateTime.now();
     _checkDeveloperMode();
+    _loadAttendancePhotos();
     _loadAuthToken(); // Hanya load, tidak auto login
   }
 
@@ -45,14 +49,20 @@ class _HomeScreenState extends State<HomeScreen> {
             item['waktu_absen'].toString().startsWith(today))
         .toList();
 
+    print('Debug: todayAbsensi: $todayAbsensi');
+
     if (todayAbsensi.isEmpty) {
       _todayFlag = null;
     } else {
       // Ambil flag terbesar hari ini (1 = masuk, 2 = keluar)
-      _todayFlag = todayAbsensi
-          .map((e) => e['flag'] ?? 1)
-          .fold(1, (prev, el) => el > prev ? el : prev);
+      final flags = todayAbsensi
+          .map((e) => (e['flag'] is int)
+              ? e['flag']
+              : int.tryParse(e['flag'].toString()) ?? 1)
+          .toList();
+      _todayFlag = flags.fold<int>(1, (prev, el) => el > prev ? el : prev);
     }
+    print('Debug: _todayFlag:  [32m [1m [4m$_todayFlag [0m');
   }
 
   Future<void> _checkDeveloperMode() async {
@@ -257,7 +267,9 @@ class _HomeScreenState extends State<HomeScreen> {
               'latitude': absensi['latitude'],
               'longitude': absensi['longitude'],
               'waktu_absen': absensi['waktu_absen'],
-              'flag': absensi['flag'] ?? 1,
+              'flag': (absensi['flag'] is int)
+                  ? absensi['flag']
+                  : int.tryParse(absensi['flag'].toString()) ?? 1,
             });
 
             // Debug print untuk foto
@@ -291,6 +303,52 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _saveAttendancePhoto(bool isMasuk, String imagePath) async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now().toString().substring(0, 10);
+    if (isMasuk) {
+      await prefs.setString('foto_jam_masuk', imagePath);
+    } else {
+      await prefs.setString('foto_jam_keluar', imagePath);
+    }
+    await prefs.setString('tanggal_absen_terakhir', today);
+    setState(() {
+      if (isMasuk) {
+        _jamMasukFile = File(imagePath);
+      } else {
+        _jamKeluarFile = File(imagePath);
+      }
+      _tanggalAbsenTerakhir = today;
+    });
+  }
+
+  Future<void> _loadAttendancePhotos() async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now().toString().substring(0, 10);
+    final lastDate = prefs.getString('tanggal_absen_terakhir');
+    if (lastDate != today) {
+      // Reset foto jika sudah beda hari
+      await prefs.remove('foto_jam_masuk');
+      await prefs.remove('foto_jam_keluar');
+      await prefs.setString('tanggal_absen_terakhir', today);
+      setState(() {
+        _jamMasukFile = null;
+        _jamKeluarFile = null;
+        _tanggalAbsenTerakhir = today;
+      });
+    } else {
+      setState(() {
+        _jamMasukFile = prefs.getString('foto_jam_masuk') != null
+            ? File(prefs.getString('foto_jam_masuk')!)
+            : null;
+        _jamKeluarFile = prefs.getString('foto_jam_keluar') != null
+            ? File(prefs.getString('foto_jam_keluar')!)
+            : null;
+        _tanggalAbsenTerakhir = lastDate;
+      });
+    }
+  }
+
   Future<void> _pickImage() async {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
@@ -317,16 +375,55 @@ class _HomeScreenState extends State<HomeScreen> {
         bool success = await _sendAttendanceToAPI();
 
         if (success) {
-          // Reload history setelah absensi berhasil
+          // Cek flag terbaru setelah reload history
           await _loadAttendanceHistory();
-
-          scaffoldMessenger.showSnackBar(
-            SnackBar(
-              content: Text(
-                  '${_todayFlag == null || _todayFlag == 2 ? "Jam Masuk" : "Jam Keluar"} berhasil direkam!'),
-              backgroundColor: Colors.green,
-            ),
+          // Cari absensi hari ini setelah update history
+          final today = DateTime.now().toString().substring(0, 10);
+          final absensiMasuk = _attendanceHistory.firstWhere(
+            (item) =>
+                item['waktu_absen'].toString().startsWith(today) &&
+                item['flag'] == 1,
+            orElse: () => {},
           );
+          final absensiKeluar = _attendanceHistory.firstWhere(
+            (item) =>
+                item['waktu_absen'].toString().startsWith(today) &&
+                item['flag'] == 2,
+            orElse: () => {},
+          );
+
+          // Simpan foto ke local sesuai flag yang baru saja direkam
+          if (absensiKeluar.isNotEmpty &&
+              absensiKeluar['waktu_absen'] != null &&
+              absensiKeluar['foto_url'] != null) {
+            // Baru saja absen keluar
+            await _saveAttendancePhoto(false, pickedFile.path);
+            scaffoldMessenger.showSnackBar(
+              const SnackBar(
+                content: Text('Jam Keluar berhasil direkam!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else if (absensiMasuk.isNotEmpty &&
+              absensiMasuk['waktu_absen'] != null &&
+              absensiMasuk['foto_url'] != null) {
+            // Baru saja absen masuk
+            await _saveAttendancePhoto(true, pickedFile.path);
+            scaffoldMessenger.showSnackBar(
+              const SnackBar(
+                content: Text('Jam Masuk berhasil direkam!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else {
+            // Fallback
+            scaffoldMessenger.showSnackBar(
+              const SnackBar(
+                content: Text('Absensi berhasil direkam!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
         }
       }
     } catch (e) {
@@ -421,7 +518,7 @@ class _HomeScreenState extends State<HomeScreen> {
         'longitude': _currentPosition!.longitude,
         'foto': fotoBase64,
         'waktu_absen': waktuAbsen,
-        'flag': (_todayFlag == null || _todayFlag == 2) ? '1' : '2',
+        'flag': (_todayFlag == null || _todayFlag == 1) ? '1' : '2',
       };
 
       print('Debug: Sending data to API...');
@@ -641,6 +738,112 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final isTimeIn = _todayFlag == null || _todayFlag == 2;
+
+    // Ambil absensi hari ini dari history
+    final today = DateTime.now().toString().substring(0, 10);
+    final absensiMasuk = _attendanceHistory.firstWhere(
+      (item) =>
+          item['waktu_absen'].toString().startsWith(today) && item['flag'] == 1,
+      orElse: () => {},
+    );
+    final absensiKeluar = _attendanceHistory.firstWhere(
+      (item) =>
+          item['waktu_absen'].toString().startsWith(today) && item['flag'] == 2,
+      orElse: () => {},
+    );
+
+    // Untuk foto dan jam masuk
+    Widget jamMasukFoto = _jamMasukFile != null
+        ? Image.file(_jamMasukFile!, fit: BoxFit.cover, width: 60, height: 60)
+        : (absensiMasuk.isNotEmpty && absensiMasuk['foto_url'] != null
+            ? Image.network(
+                'https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiMasuk['foto_url']}',
+                fit: BoxFit.cover,
+                width: 60,
+                height: 60,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return SizedBox(
+                    width: 60,
+                    height: 60,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  print('Debug: Error loading image: $error');
+                  print(
+                      'Debug: Attempted URL: https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiMasuk['foto_url']}');
+                  return Text(
+                    _getUserInitials(),
+                    style: const TextStyle(
+                      color: Colors.orange,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  );
+                },
+              )
+            : Text(_getUserInitials(),
+                style: const TextStyle(fontWeight: FontWeight.bold)));
+    String jamMasukWaktu =
+        (absensiMasuk.isNotEmpty && absensiMasuk['waktu_absen'] != null)
+            ? _formatTime(DateTime.parse(absensiMasuk['waktu_absen']))
+            : '--:--';
+
+    // Untuk foto dan jam keluar
+    Widget jamKeluarFoto = _jamKeluarFile != null
+        ? Image.file(_jamKeluarFile!, fit: BoxFit.cover, width: 60, height: 60)
+        : (absensiKeluar.isNotEmpty && absensiKeluar['foto_url'] != null
+            ? Image.network(
+                'https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiKeluar['foto_url']}',
+                fit: BoxFit.cover,
+                width: 60,
+                height: 60,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return SizedBox(
+                    width: 60,
+                    height: 60,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  print('Debug: Error loading image: $error');
+                  print(
+                      'Debug: Attempted URL: https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiKeluar['foto_url']}');
+                  return Text(
+                    _getUserInitials(),
+                    style: const TextStyle(
+                      color: Colors.orange,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  );
+                },
+              )
+            : Text(_getUserInitials(),
+                style: const TextStyle(fontWeight: FontWeight.bold)));
+    String jamKeluarWaktu =
+        (absensiKeluar.isNotEmpty && absensiKeluar['waktu_absen'] != null)
+            ? _formatTime(DateTime.parse(absensiKeluar['waktu_absen']))
+            : '--:--';
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -756,35 +959,14 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: CircleAvatar(
                                 radius: 30,
                                 backgroundColor: Colors.grey[200],
-                                child: _imageFile != null && isTimeIn
-                                    ? ClipOval(
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            borderRadius:
-                                                BorderRadius.circular(30),
-                                            border: Border.all(
-                                                color: Colors.white, width: 2),
-                                          ),
-                                          child: Image.file(_imageFile!,
-                                              fit: BoxFit.cover,
-                                              width: 60,
-                                              height: 60),
-                                        ),
-                                      )
-                                    : Text(_getUserInitials(),
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold)),
+                                child: jamMasukFoto,
                               ),
                             ),
                             const SizedBox(height: 8),
                             const Text('Jam Masuk',
                                 style: TextStyle(fontSize: 12)),
                             Text(
-                              _lastAttendanceTime != null &&
-                                      isTimeIn &&
-                                      _imageFile != null
-                                  ? _formatTime(_lastAttendanceTime!)
-                                  : '--:--',
+                              jamMasukWaktu,
                               style:
                                   const TextStyle(fontWeight: FontWeight.bold),
                             ),
@@ -822,35 +1004,14 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: CircleAvatar(
                                 radius: 30,
                                 backgroundColor: Colors.grey[200],
-                                child: _imageFile != null && !isTimeIn
-                                    ? ClipOval(
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            borderRadius:
-                                                BorderRadius.circular(30),
-                                            border: Border.all(
-                                                color: Colors.white, width: 2),
-                                          ),
-                                          child: Image.file(_imageFile!,
-                                              fit: BoxFit.cover,
-                                              width: 60,
-                                              height: 60),
-                                        ),
-                                      )
-                                    : Text(_getUserInitials(),
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold)),
+                                child: jamKeluarFoto,
                               ),
                             ),
                             const SizedBox(height: 8),
                             const Text('Jam Keluar',
                                 style: TextStyle(fontSize: 12)),
                             Text(
-                              _lastAttendanceTime != null &&
-                                      !isTimeIn &&
-                                      _imageFile != null
-                                  ? _formatTime(_lastAttendanceTime!)
-                                  : '--:--',
+                              jamKeluarWaktu,
                               style:
                                   const TextStyle(fontWeight: FontWeight.bold),
                             ),

@@ -80,9 +80,11 @@ class AndroidController extends Controller
 
         $data = $validator->validated();
 
-        $kantorLat = -6.881233;
-        $kantorLng = 107.587617;
-        $radius = 100; // meter
+        // $kantorLat = -6.881233;
+        $kantorLat = 37.4219980;
+        // $kantorLng = 107.587617;
+        $kantorLng = -122.084;
+        $radius = 40000; // meter
 
         $jarak = $this->hitungJarak($kantorLat, $kantorLng, $data['latitude'], $data['longitude']);
 
@@ -104,8 +106,13 @@ class AndroidController extends Controller
 
         // Tentukan flag
         $flag = 1;
-        if ($absensiToday->where('flag', 1)->count() > 0) {
+        if ($absensiToday->where('flag', 1)->count() > 0 && $absensiToday->where('flag', 2)->count() == 0) {
             $flag = 2;
+        } elseif ($absensiToday->where('flag', 2)->count() > 0) {
+            // Sudah absen keluar hari ini, bisa return error atau reset ke 1 jika diizinkan
+            return response()->json([
+                'message' => 'Sudah absen masuk dan keluar hari ini',
+            ], 400);
         }
 
         // Simpan foto
