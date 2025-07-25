@@ -70,7 +70,7 @@ class _LoginFormState extends State<LoginForm> {
       );
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-      print('Login berhasil, token: $token');
+      // print('Login berhasil, token: $token');
       if (token != null) {
         final response = await http.get(
           Uri.parse(
@@ -80,10 +80,10 @@ class _LoginFormState extends State<LoginForm> {
             'Content-Type': 'application/json',
           },
         );
-        print('Response dashboardAndroid: ${response.body}');
+        // print('Response dashboardAndroid: ${response.body}');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          print('User data: ${data['data']}');
+          // print('User data: ${data['data']}');
           if (data['data'] != null) {
             await prefs.setString('user_data', jsonEncode(data['data']));
             if (context.mounted) {

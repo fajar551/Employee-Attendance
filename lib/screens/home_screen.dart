@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_exif_rotation/flutter_exif_rotation.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http; // Added for http
@@ -168,57 +167,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // Function untuk login dan mendapatkan token
-  Future<bool> _loginAndGetToken(String email, String password) async {
-    try {
-      print('Debug: Attempting login with email: $email');
-
-      final response = await http.post(
-        Uri.parse('https://absensi.qwords.com/backend/public/api/login'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-        }),
-      );
-
-      print('Debug: Login response status: ${response.statusCode}');
-      print('Debug: Login response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        print('Debug: Response data: $responseData');
-
-        // Cek field access_token (bukan token)
-        if (responseData['access_token'] != null) {
-          await _saveAuthToken(responseData['access_token']);
-          print(
-              'Debug: Access token saved successfully: ${responseData['access_token']}');
-
-          // Simpan data user jika ada
-          if (responseData['user'] != null) {
-            await _saveUserData(responseData['user']);
-            print(
-                'Debug: User data saved successfully: ${responseData['user']}');
-          }
-
-          return true;
-        } else {
-          print('Debug: No access_token in response');
-          return false;
-        }
-      } else {
-        print('Debug: Login failed with status: ${response.statusCode}');
-        return false;
-      }
-    } catch (e) {
-      print('Debug: Error saat login: $e');
-      return false;
-    }
-  }
-
   // Function untuk mengambil data history absensi dari API
   Future<void> _loadAttendanceHistory() async {
     if (_authToken == null || _authToken!.isEmpty) {
@@ -366,11 +314,10 @@ class _HomeScreenState extends State<HomeScreen> {
           await _picker.pickImage(source: ImageSource.camera);
 
       if (pickedFile != null) {
-        // Fix rotasi foto jika perlu
-        final File fixedImage =
-            await FlutterExifRotation.rotateImage(path: pickedFile.path);
+        // Gunakan file langsung tanpa rotasi EXIF
+        final File imageFile = File(pickedFile.path);
         setState(() {
-          _imageFile = fixedImage;
+          _imageFile = imageFile;
           _lastAttendanceTime = DateTime.now();
         });
 
@@ -403,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
               absensiKeluar['waktu_absen'] != null &&
               absensiKeluar['foto_url'] != null) {
             // Baru saja absen keluar
-            await _saveAttendancePhoto(false, fixedImage.path);
+            await _saveAttendancePhoto(false, imageFile.path);
             scaffoldMessenger.showSnackBar(
               const SnackBar(
                 content: Text('Jam Keluar berhasil direkam!'),
@@ -414,7 +361,7 @@ class _HomeScreenState extends State<HomeScreen> {
               absensiMasuk['waktu_absen'] != null &&
               absensiMasuk['foto_url'] != null) {
             // Baru saja absen masuk
-            await _saveAttendancePhoto(true, fixedImage.path);
+            await _saveAttendancePhoto(true, imageFile.path);
             scaffoldMessenger.showSnackBar(
               const SnackBar(
                 content: Text('Jam Masuk berhasil direkam!'),
@@ -879,7 +826,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             // User Profile Section
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               color: Colors.white,
               child: Row(
                 children: [
@@ -919,7 +866,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Attendance Card
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
+              margin: const EdgeInsets.symmetric(horizontal: 12),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -947,7 +894,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: TextStyle(fontSize: 13, color: Colors.grey)),
                   // Tambahkan garis bawah setelah shift
                   const Padding(
-                    padding: EdgeInsets.only(top: 8, bottom: 8),
+                    padding: EdgeInsets.only(top: 4, bottom: 4),
                     child: Divider(
                       height: 2,
                       thickness: 2,
@@ -960,7 +907,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     padding:
-                        const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
                     child: Row(
                       children: [
                         // Time In
@@ -1074,7 +1021,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       onPressed: _isLoading ? null : _pickImage,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFF18222),
-                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        padding: const EdgeInsets.symmetric(vertical: 7),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -1132,7 +1079,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               Text(
                                 'Lihat Detail',
                                 style: TextStyle(
-                                  color: const Color(0xFFF18222),
+                                  color: Color(0xFFF18222),
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                 ),
@@ -1239,7 +1186,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   Text(
                                     'Sembunyikan Detail',
                                     style: TextStyle(
-                                      color: const Color(0xFFF18222),
+                                      color: Color(0xFFF18222),
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,
                                     ),
@@ -1263,7 +1210,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             // Menu Favorit Card
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Card(
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -1273,14 +1220,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.white,
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
+                      const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text('Menu Favorit',
                           style: TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 16)),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 5),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
@@ -1308,7 +1255,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             // Info Perusahaan Card
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Card(
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -1318,7 +1265,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.white,
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
+                      const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1389,7 +1336,7 @@ class _HomeScreenState extends State<HomeScreen> {
       String status, File? imageFile, String? fotoUrl) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
