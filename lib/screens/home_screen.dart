@@ -74,28 +74,8 @@ class _HomeScreenState extends State<HomeScreen> {
       const platform = MethodChannel('developer_mode_check');
       final isDevMode =
           await platform.invokeMethod<bool>('isDeveloperMode') ?? false;
-      if (isDevMode) {
-        if (mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => AlertDialog(
-              title: const Text('Peringatan'),
-              content: const Text(
-                  'Tidak bisa absen karena Developer Mode/USB Debugging aktif. Silakan matikan Developer Mode.'),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    Navigator.pushReplacementNamed(context, '/login');
-                  },
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
-        }
-      }
+      // Hapus redirect ke login, hanya simpan status developer mode
+      print('Debug: Developer mode status: $isDevMode');
     } catch (e) {
       print('Error checking developer mode: $e');
     }
@@ -301,19 +281,53 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _pickImage() async {
+    // Simpan context dan mounted check sebelum async operations
     final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final isMounted = mounted;
 
     try {
+      // Cek developer mode sebelum async gap
+      const platform = MethodChannel('developer_mode_check');
+      final isDevMode =
+          await platform.invokeMethod<bool>('isDeveloperMode') ?? false;
+
+      if (isDevMode && mounted) {
+        // Panggil showDialog dengan context yang valid
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('Peringatan'),
+              content: const Text(
+                  'Tidak bisa absen karena Developer Mode/USB Debugging aktif. Silakan matikan Developer Mode.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        });
+        return;
+      }
+
       // Set loading state
-      setState(() {
-        _isLoading = true;
-      });
+      if (isMounted) {
+        setState(() {
+          _isLoading = true;
+        });
+      }
 
       // Ambil foto dari kamera
       final XFile? pickedFile =
           await _picker.pickImage(source: ImageSource.camera);
 
-      if (pickedFile != null) {
+      if (pickedFile != null && isMounted) {
         // Gunakan file langsung tanpa rotasi EXIF
         final File imageFile = File(pickedFile.path);
         setState(() {
@@ -327,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // Kirim data ke API
         bool success = await _sendAttendanceToAPI();
 
-        if (success) {
+        if (success && isMounted) {
           // Cek flag terbaru setelah reload history
           await _loadAttendanceHistory();
           // Cari absensi hari ini setelah update history
@@ -392,19 +406,23 @@ class _HomeScreenState extends State<HomeScreen> {
         errorMessage = 'Terjadi kesalahan: ${e.toString()}';
       }
 
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.red,
-          duration: const Duration(
-              seconds: 5), // Tampilkan lebih lama untuk pesan error
-        ),
-      );
+      if (isMounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(
+                seconds: 5), // Tampilkan lebih lama untuk pesan error
+          ),
+        );
+      }
     } finally {
       // Reset loading state
-      setState(() {
-        _isLoading = false;
-      });
+      if (isMounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -530,72 +548,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Function untuk test API tanpa foto
-  // Future<bool> _testAPI() async {
-  //   try {
-  //     // Ambil lokasi terlebih dahulu
-  //     await _getLocation();
-
-  //     if (_currentPosition == null) {
-  //       print('Debug: Tidak bisa mendapatkan lokasi');
-  //       return false;
-  //     }
-
-  //     // Data test tanpa foto
-  //     Map<String, dynamic> testData = {
-  //       'latitude': _currentPosition!.latitude,
-  //       'longitude': _currentPosition!.longitude,
-  //       'foto':
-  //           'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', // 1x1 pixel transparent PNG
-  //       'waktu_absen': DateTime.now().toString().substring(0, 19),
-  //     };
-
-  //     print('Debug: Testing API with data: $testData');
-
-  //     final response = await http.post(
-  //       Uri.parse('https://absensi.qwords.com/backend/public/api/absensi'),
-  //       headers: {
-  //         'Authorization': 'Bearer $_authToken',
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: jsonEncode(testData),
-  //     );
-
-  //     print('Debug: Test response status: ${response.statusCode}');
-  //     print('Debug: Test response body: ${response.body}');
-
-  //     if (response.statusCode == 200) {
-  //       return true;
-  //     } else if (response.statusCode == 403) {
-  //       // Gagal karena diluar jangkauan
-  //       try {
-  //         final errorData = jsonDecode(response.body);
-  //         final message = errorData['message'] ?? 'Anda berada di luar jangkauan kantor';
-  //         final jarak = errorData['jarak']?.toString() ?? '';
-  //         final radius = errorData['radius']?.toString() ?? '';
-
-  //         print('Debug: Test API failed - $message (Jarak: ${jarak}m, Radius: ${radius}m)');
-  //       } catch (e) {
-  //         print('Debug: Test API failed - Anda berada di luar jangkauan kantor');
-  //       }
-  //       return false;
-  //     } else {
-  //       // Gagal karena alasan lain
-  //       try {
-  //         final errorData = jsonDecode(response.body);
-  //         final message = errorData['message'] ?? 'Gagal test API';
-  //         print('Debug: Test API failed - $message');
-  //       } catch (e) {
-  //         print('Debug: Test API failed - Status: ${response.statusCode}');
-  //       }
-  //       return false;
-  //     }
-  //   } catch (e) {
-  //     print('Debug: Test API error: $e');
-  //     return false;
-  //   }
-  // }
-
   String _formatTime(DateTime time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
@@ -707,42 +659,59 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Untuk foto dan jam masuk
     Widget jamMasukFoto = _jamMasukFile != null
-        ? Image.file(_jamMasukFile!, fit: BoxFit.cover, width: 60, height: 60)
+        ? ClipOval(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: Image.file(_jamMasukFile!,
+                  fit: BoxFit.cover, width: 60, height: 60),
+            ),
+          )
         : (absensiMasuk.isNotEmpty && absensiMasuk['foto_url'] != null
-            ? Image.network(
-                'https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiMasuk['foto_url']}',
-                fit: BoxFit.cover,
-                width: 60,
-                height: 60,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return SizedBox(
+            ? ClipOval(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: Image.network(
+                    'https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiMasuk['foto_url']}',
+                    fit: BoxFit.cover,
                     width: 60,
                     height: 60,
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                            : null,
-                      ),
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  print('Debug: Error loading image: $error');
-                  print(
-                      'Debug: Attempted URL: https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiMasuk['foto_url']}');
-                  return Text(
-                    _getUserInitials(),
-                    style: const TextStyle(
-                      color: Colors.orange,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  );
-                },
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return SizedBox(
+                        width: 60,
+                        height: 60,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      print('Debug: Error loading image: $error');
+                      print(
+                          'Debug: Attempted URL: https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiMasuk['foto_url']}');
+                      return Text(
+                        _getUserInitials(),
+                        style: const TextStyle(
+                          color: Colors.orange,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    },
+                  ),
+                ),
               )
             : Text(_getUserInitials(),
                 style: const TextStyle(fontWeight: FontWeight.bold)));
@@ -753,42 +722,59 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Untuk foto dan jam keluar
     Widget jamKeluarFoto = _jamKeluarFile != null
-        ? Image.file(_jamKeluarFile!, fit: BoxFit.cover, width: 60, height: 60)
+        ? ClipOval(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: Image.file(_jamKeluarFile!,
+                  fit: BoxFit.cover, width: 60, height: 60),
+            ),
+          )
         : (absensiKeluar.isNotEmpty && absensiKeluar['foto_url'] != null
-            ? Image.network(
-                'https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiKeluar['foto_url']}',
-                fit: BoxFit.cover,
-                width: 60,
-                height: 60,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return SizedBox(
+            ? ClipOval(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: Image.network(
+                    'https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiKeluar['foto_url']}',
+                    fit: BoxFit.cover,
                     width: 60,
                     height: 60,
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                            : null,
-                      ),
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  print('Debug: Error loading image: $error');
-                  print(
-                      'Debug: Attempted URL: https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiKeluar['foto_url']}');
-                  return Text(
-                    _getUserInitials(),
-                    style: const TextStyle(
-                      color: Colors.orange,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  );
-                },
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return SizedBox(
+                        width: 60,
+                        height: 60,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      print('Debug: Error loading image: $error');
+                      print(
+                          'Debug: Attempted URL: https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiKeluar['foto_url']}');
+                      return Text(
+                        _getUserInitials(),
+                        style: const TextStyle(
+                          color: Colors.orange,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    },
+                  ),
+                ),
               )
             : Text(_getUserInitials(),
                 style: const TextStyle(fontWeight: FontWeight.bold)));
@@ -1575,8 +1561,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       children: [
         Container(
-          width: 54,
-          height: 54,
+          width: 42,
+          height: 42,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: LinearGradient(
@@ -1585,7 +1571,7 @@ class _HomeScreenState extends State<HomeScreen> {
               end: Alignment.bottomRight,
             ),
           ),
-          child: Icon(icon, color: Colors.deepOrange, size: 28),
+          child: Icon(icon, color: Colors.deepOrange, size: 20),
         ),
         const SizedBox(height: 6),
         Text(label, style: const TextStyle(fontSize: 12)),
