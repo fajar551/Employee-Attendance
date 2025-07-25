@@ -17,12 +17,14 @@ class LoginForm extends StatefulWidget {
 
 class _LoginFormState extends State<LoginForm> {
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _isPasswordVisible = false;
   bool _keepMeLoggedIn = true;
   bool _agreeToPrivacy = false;
+  bool _isLoginMode = true; // true = login, false = register
   String? _errorMessage;
 
   @override
@@ -30,6 +32,7 @@ class _LoginFormState extends State<LoginForm> {
     super.initState();
 
     // Add listeners to update button color in real-time
+    _nameController.addListener(_updateButtonColor);
     _usernameController.addListener(_updateButtonColor);
     _passwordController.addListener(_updateButtonColor);
   }
@@ -42,8 +45,10 @@ class _LoginFormState extends State<LoginForm> {
 
   @override
   void dispose() {
+    _nameController.removeListener(_updateButtonColor);
     _usernameController.removeListener(_updateButtonColor);
     _passwordController.removeListener(_updateButtonColor);
+    _nameController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -64,50 +69,124 @@ class _LoginFormState extends State<LoginForm> {
     });
 
     try {
-      await AuthService.login(
+      final data = await AuthService.login(
         _usernameController.text.trim(),
         _passwordController.text.trim(),
       );
+
+      // Simpan data user
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
-      // print('Login berhasil, token: $token');
-      if (token != null) {
-        final response = await http.get(
-          Uri.parse(
-              'https://absensi.qwords.com/backend/public/api/dashboardAndroid'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        );
-        // print('Response dashboardAndroid: ${response.body}');
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          // print('User data: ${data['data']}');
-          if (data['data'] != null) {
-            await prefs.setString('user_data', jsonEncode(data['data']));
-            if (context.mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HomeScreen()),
-              );
+
+      // Jika data user ada dalam response, simpan
+      if (data['data'] != null) {
+        await prefs.setString('user_data', jsonEncode(data['data']));
+      } else {
+        // Jika tidak ada data user dalam response, ambil dari API dashboard
+        try {
+          final token = data['access_token'];
+          if (token != null) {
+            final response = await http.get(
+              Uri.parse(
+                  'https://absensi.qwords.com/backend/public/api/dashboardAndroid'),
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json',
+              },
+            );
+
+            if (response.statusCode == 200) {
+              final dashboardData = jsonDecode(response.body);
+              if (dashboardData['data'] != null) {
+                await prefs.setString(
+                    'user_data', jsonEncode(dashboardData['data']));
+              }
             }
-            return;
           }
+        } catch (e) {
+          print('Error fetching user data: $e');
         }
-        setState(() {
-          _errorMessage = 'Login berhasil, tapi gagal mengambil data user.';
-        });
-        return;
+      }
+
+      if (context.mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
       }
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
       });
     } finally {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (!_agreeToPrivacy) {
+      setState(() {
+        _errorMessage = 'Anda harus menyetujui Kebijakan Privasi';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final data = await AuthService.register(
+        _nameController.text.trim(),
+        _usernameController.text.trim(),
+        _passwordController.text.trim(),
+      );
+
+      // Simpan data user
+      final prefs = await SharedPreferences.getInstance();
+      if (data['data'] != null) {
+        await prefs.setString('user_data', jsonEncode(data['data']));
+      }
+
+      if (context.mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _toggleMode() {
+    setState(() {
+      _isLoginMode = !_isLoginMode;
+      _errorMessage = null;
+      // Clear form when switching modes
+      if (_isLoginMode) {
+        _nameController.clear();
+      }
+    });
+  }
+
+  bool _isFormValid() {
+    if (_isLoginMode) {
+      return _usernameController.text.isNotEmpty &&
+          _passwordController.text.isNotEmpty;
+    } else {
+      return _nameController.text.isNotEmpty &&
+          _usernameController.text.isNotEmpty &&
+          _passwordController.text.isNotEmpty;
     }
   }
 
@@ -118,10 +197,109 @@ class _LoginFormState extends State<LoginForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Username Field
-          const Text(
-            'Nama Pengguna',
-            style: TextStyle(
+          // Mode Toggle
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (!_isLoginMode) _toggleMode();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color:
+                            _isLoginMode ? Colors.orange : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Masuk',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _isLoginMode ? Colors.white : Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_isLoginMode) _toggleMode();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color:
+                            !_isLoginMode ? Colors.orange : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Daftar',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color:
+                              !_isLoginMode ? Colors.white : Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Name Field (only for register)
+          if (!_isLoginMode) ...[
+            const Text(
+              'Nama Lengkap',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                hintText: 'Masukkan nama lengkap',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.orange),
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Nama tidak boleh kosong';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+
+          // Email Field
+          Text(
+            _isLoginMode ? 'Nama Pengguna' : 'Email',
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
@@ -130,7 +308,8 @@ class _LoginFormState extends State<LoginForm> {
           TextFormField(
             controller: _usernameController,
             decoration: InputDecoration(
-              hintText: 'Masukkan Nama pengguna',
+              hintText:
+                  _isLoginMode ? 'Masukkan Nama pengguna' : 'Masukkan email',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(color: Colors.grey[300]!),
@@ -146,7 +325,18 @@ class _LoginFormState extends State<LoginForm> {
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
-            validator: validateEmail,
+            validator: _isLoginMode
+                ? validateEmail
+                : (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Email tidak boleh kosong';
+                    }
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                        .hasMatch(value)) {
+                      return 'Email tidak valid';
+                    }
+                    return null;
+                  },
           ),
           const SizedBox(height: 20),
 
@@ -190,44 +380,53 @@ class _LoginFormState extends State<LoginForm> {
                 },
               ),
             ),
-            validator: validatePassword,
+            validator: _isLoginMode
+                ? (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Kata sandi tidak boleh kosong';
+                    }
+                    return null;
+                  }
+                : validatePassword,
           ),
           const SizedBox(height: 20),
 
           // Checkboxes and Links
-          Row(
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Checkbox(
-                      value: _keepMeLoggedIn,
-                      onChanged: (value) {
-                        setState(() {
-                          _keepMeLoggedIn = value ?? false;
-                        });
-                      },
-                      activeColor: Colors.orange,
-                    ),
-                    const Text(
-                      'Biarkan saya tetap masuk',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                  ],
-                ),
-              ),
-              TextButton(
-                onPressed: () {},
-                child: const Text(
-                  'Lupa Kata Sandi?',
-                  style: TextStyle(
-                    color: Colors.orange,
-                    fontSize: 14,
+          if (_isLoginMode) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: _keepMeLoggedIn,
+                        onChanged: (value) {
+                          setState(() {
+                            _keepMeLoggedIn = value ?? false;
+                          });
+                        },
+                        activeColor: Colors.orange,
+                      ),
+                      const Text(
+                        'Biarkan saya tetap masuk',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
-          ),
+                TextButton(
+                  onPressed: () {},
+                  child: const Text(
+                    'Lupa Kata Sandi?',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
 
           Row(
             children: [
@@ -275,20 +474,16 @@ class _LoginFormState extends State<LoginForm> {
 
           if (_errorMessage != null) const SizedBox(height: 16),
 
-          // Login Button
+          // Login/Register Button
           SizedBox(
             height: 48,
             child: ElevatedButton(
-              onPressed: _isLoading ? null : _login,
+              onPressed:
+                  _isLoading ? null : (_isLoginMode ? _login : _register),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _usernameController.text.isNotEmpty &&
-                        _passwordController.text.isNotEmpty
-                    ? Colors.orange
-                    : Colors.grey[300],
-                foregroundColor: _usernameController.text.isNotEmpty &&
-                        _passwordController.text.isNotEmpty
-                    ? Colors.white
-                    : Colors.black,
+                backgroundColor:
+                    _isFormValid() ? Colors.orange : Colors.grey[300],
+                foregroundColor: _isFormValid() ? Colors.white : Colors.black,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -300,9 +495,9 @@ class _LoginFormState extends State<LoginForm> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text(
-                      'Masuk',
-                      style: TextStyle(
+                  : Text(
+                      _isLoginMode ? 'Masuk' : 'Daftar',
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
                       ),
@@ -336,9 +531,9 @@ class _LoginFormState extends State<LoginForm> {
               onPressed: () {},
               icon: const Icon(Icons.g_mobiledata,
                   size: 24, color: Colors.orange),
-              label: const Text(
-                'Login Dengan Google',
-                style: TextStyle(
+              label: Text(
+                _isLoginMode ? 'Login Dengan Google' : 'Daftar Dengan Google',
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                   color: Colors.orange,
@@ -366,9 +561,11 @@ class _LoginFormState extends State<LoginForm> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text(
-                'Login Dengan Cara Lain',
-                style: TextStyle(
+              child: Text(
+                _isLoginMode
+                    ? 'Login Dengan Cara Lain'
+                    : 'Daftar Dengan Cara Lain',
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                   color: Colors.orange,

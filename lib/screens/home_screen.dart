@@ -1509,7 +1509,7 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
           title: const Text(
-            'Logout',
+            'Keluar',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           content: const Text(
