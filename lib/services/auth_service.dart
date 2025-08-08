@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  static const String baseUrl = 'https://absensi.qwords.com/backend/public/api';
+  static const String baseUrl = 'https://hris.qwords.com/backend/public/api';
 
   static Future<Map<String, dynamic>> login(
       String email, String password) async {

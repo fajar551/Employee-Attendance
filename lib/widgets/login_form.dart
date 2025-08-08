@@ -87,7 +87,7 @@ class _LoginFormState extends State<LoginForm> {
           if (token != null) {
             final response = await http.get(
               Uri.parse(
-                  'https://absensi.qwords.com/backend/public/api/dashboardAndroid'),
+                  'https://hris.qwords.com/backend/public/api/dashboardAndroid'),
               headers: {
                 'Authorization': 'Bearer $token',
                 'Content-Type': 'application/json',

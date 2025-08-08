@@ -163,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final response = await http.get(
         Uri.parse(
-            'https://absensi.qwords.com/backend/public/api/getAbsensiHistoryAndroid'),
+            'https://hris.qwords.com/backend/public/api/getAbsensiHistoryAndroid'),
         headers: {
           'Authorization': 'Bearer $_authToken',
           'Content-Type': 'application/json',
@@ -500,8 +500,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Kirim request ke API
       final response = await http.post(
-        Uri.parse(
-            'https://absensi.qwords.com/backend/public/api/absensiAndroid'),
+        Uri.parse('https://hris.qwords.com/backend/public/api/absensiAndroid'),
         headers: {
           'Authorization': 'Bearer $_authToken',
           'Content-Type': 'application/json',
@@ -613,7 +612,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final response = await http.get(
         Uri.parse(
-            'https://absensi.qwords.com/backend/public/api/dashboardAndroid'),
+            'https://hris.qwords.com/backend/public/api/dashboardAndroid'),
         headers: {
           'Authorization': 'Bearer $_authToken',
           'Content-Type': 'application/json',
@@ -677,7 +676,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     border: Border.all(color: Colors.white, width: 2),
                   ),
                   child: Image.network(
-                    'https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiMasuk['foto_url']}',
+                    'https://hris.qwords.com/backend/storage/app/public/absensi/${absensiMasuk['foto_url']}',
                     fit: BoxFit.cover,
                     width: 60,
                     height: 60,
@@ -700,7 +699,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     errorBuilder: (context, error, stackTrace) {
                       print('Debug: Error loading image: $error');
                       print(
-                          'Debug: Attempted URL: https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiMasuk['foto_url']}');
+                          'Debug: Attempted URL: https://hris.qwords.com/backend/storage/app/public/absensi/${absensiMasuk['foto_url']}');
                       return Text(
                         _getUserInitials(),
                         style: const TextStyle(
@@ -740,7 +739,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     border: Border.all(color: Colors.white, width: 2),
                   ),
                   child: Image.network(
-                    'https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiKeluar['foto_url']}',
+                    'https://hris.qwords.com/backend/storage/app/public/absensi/${absensiKeluar['foto_url']}',
                     fit: BoxFit.cover,
                     width: 60,
                     height: 60,
@@ -763,7 +762,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     errorBuilder: (context, error, stackTrace) {
                       print('Debug: Error loading image: $error');
                       print(
-                          'Debug: Attempted URL: https://absensi.qwords.com/backend/storage/app/public/absensi/${absensiKeluar['foto_url']}');
+                          'Debug: Attempted URL: https://hris.qwords.com/backend/storage/app/public/absensi/${absensiKeluar['foto_url']}');
                       return Text(
                         _getUserInitials(),
                         style: const TextStyle(
@@ -1369,7 +1368,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               border: Border.all(color: Colors.white, width: 1),
                             ),
                             child: Image.network(
-                              'https://absensi.qwords.com/backend/storage/app/public/absensi/$fotoUrl',
+                              'https://hris.qwords.com/backend/storage/app/public/absensi/$fotoUrl',
                               fit: BoxFit.cover,
                               width: 40,
                               height: 40,
@@ -1397,7 +1396,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               errorBuilder: (context, error, stackTrace) {
                                 print('Debug: Error loading image: $error');
                                 print(
-                                    'Debug: Attempted URL: https://absensi.qwords.com/backend/storage/app/public/absensi/$fotoUrl');
+                                    'Debug: Attempted URL: https://hris.qwords.com/backend/storage/app/public/absensi/$fotoUrl');
                                 return Text(
                                   _getUserInitials(),
                                   style: const TextStyle(

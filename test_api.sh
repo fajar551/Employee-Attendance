@@ -1,13 +1,13 @@
 #!/bin/bash
 
 echo "=== Testing Login API ==="
-echo "URL: https://absensi.qwords.com/backend/public/api/login"
+echo "URL: https://hris.qwords.com/backend/public/api/login"
 echo ""
 
 # Test Login
 echo "1. Testing Login..."
 LOGIN_RESPONSE=$(curl -s -w "\n%{http_code}" \
-  --location 'https://absensi.qwords.com/backend/public/api/login' \
+  --location 'https://hris.qwords.com/backend/public/api/login' \
   --header 'Content-Type: application/json' \
   --data-raw '{
     "email": "admin@gmail.com",
@@ -37,7 +37,7 @@ if [ "$LOGIN_STATUS" -eq 200 ]; then
         
         # Test Absensi
         ABSENSI_RESPONSE=$(curl -s -w "\n%{http_code}" \
-          --location 'https://absensi.qwords.com/backend/public/api/absensi' \
+          --location 'https://hris.qwords.com/backend/public/api/absensi' \
           --header "Authorization: Bearer $TOKEN" \
           --header 'Content-Type: application/json' \
           --data-raw '{

@@ -5,8 +5,7 @@ import 'package:http/http.dart' as http;
 class ApiService {
   static Future<Map<String, dynamic>> login(
       String email, String password) async {
-    final url =
-        Uri.parse('https://absensi.qwords.com/backend/public/api/login');
+    final url = Uri.parse('https://hris.qwords.com/backend/public/api/login');
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},

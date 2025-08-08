@@ -143,7 +143,7 @@ Aplikasi memiliki tombol testing untuk debugging:
 ### Login
 
 ```bash
-curl --location 'https://absensi.qwords.com/backend/public/api/login' \
+curl --location 'https://hris.qwords.com/backend/public/api/login' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "email": "admin@gmail.com",
@@ -154,7 +154,7 @@ curl --location 'https://absensi.qwords.com/backend/public/api/login' \
 ### Absensi
 
 ```bash
-curl --location 'https://absensi.qwords.com/backend/public/api/absensi' \
+curl --location 'https://hris.qwords.com/backend/public/api/absensi' \
 --header 'Authorization: Bearer {TOKEN_KAMU}' \
 --header 'Content-Type: application/json' \
 --data-raw '{
