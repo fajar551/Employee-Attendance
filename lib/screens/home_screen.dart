@@ -97,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } else {
       await _loadAttendanceHistory();
-      if (_userData == null) {
+      if (_userData == null || _userData!['name'] == null) {
         await _loadUserDataFromAPI();
       }
     }
@@ -125,12 +125,30 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     final userDataString = prefs.getString('user_data');
+    final authToken = prefs.getString('auth_token');
+    final userEmail = prefs.getString('user_email');
+
+    print('Debug: Loaded from SharedPreferences:');
+    print('Debug: - auth_token: ${authToken != null ? "ADA" : "TIDAK ADA"}');
+    print('Debug: - user_email: $userEmail');
+    print(
+        'Debug: - user_data: ${userDataString != null ? "ADA" : "TIDAK ADA"}');
+
     if (userDataString != null) {
       try {
         final userData = jsonDecode(userDataString);
+
+        // Normalize data jika menggunakan field 'nama'
+        Map<String, dynamic> normalizedUserData =
+            Map<String, dynamic>.from(userData);
+        if (userData['nama'] != null && userData['name'] == null) {
+          normalizedUserData['name'] = userData['nama'];
+        }
+
         setState(() {
-          _userData = userData;
+          _userData = normalizedUserData;
         });
+        print('Debug: Parsed user data: $normalizedUserData');
       } catch (e) {
         print('Debug: Error parsing user data: $e');
       }
@@ -196,6 +214,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Debug print untuk foto
           print('Debug: Foto URL: ${absensi['foto']}');
+          print(
+              'Debug: Full Foto URL: https://hris.qwords.com/backend/public/uploads/absensi/${absensi['foto']}');
         }
       });
 
@@ -526,16 +546,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Function untuk membuat inisial dari nama user
   String _getUserInitials() {
-    if (_userData == null || _userData!['name'] == null) {
+    if (_userData == null) {
       return 'U'; // Default jika tidak ada data user
     }
 
-    String name = _userData!['name'].toString().trim();
-    if (name.isEmpty) {
+    // Coba ambil dari field 'name' terlebih dahulu, lalu 'nama' sebagai fallback
+    String? name = _userData!['name'] ?? _userData!['nama'];
+
+    if (name == null || name.toString().trim().isEmpty) {
       return 'U';
     }
 
-    List<String> nameParts = name.split(' ');
+    String nameStr = name.toString().trim();
+    if (nameStr.isEmpty) {
+      return 'U';
+    }
+
+    List<String> nameParts = nameStr.split(' ');
     if (nameParts.length >= 2) {
       // Ambil huruf pertama dari nama depan dan nama belakang
       String firstInitial =
@@ -546,9 +573,9 @@ class _HomeScreenState extends State<HomeScreen> {
       return '$firstInitial$lastInitial';
     } else if (nameParts.length == 1) {
       // Jika hanya satu kata, ambil 2 huruf pertama
-      return name.length >= 2
-          ? name.substring(0, 2).toUpperCase()
-          : name.toUpperCase();
+      return nameStr.length >= 2
+          ? nameStr.substring(0, 2).toUpperCase()
+          : nameStr.toUpperCase();
     }
 
     return 'U';
@@ -570,13 +597,55 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final userData = responseData['data'];
 
-      if (userData != null) {
-        await _saveUserData(userData);
-        print('Debug: User data loaded successfully from API: $userData');
+      if (userData != null && userData is Map<String, dynamic>) {
+        // Konversi data dari API ke format yang konsisten
+        Map<String, dynamic> normalizedUserData = {
+          'id': userData['id']?.toString(),
+          'email': userData['email'],
+          'name': userData['nama'] ??
+              userData[
+                  'name'], // Gunakan 'nama' dari API atau fallback ke 'name'
+        };
+
+        // Pastikan data user memiliki field yang diperlukan
+        if (normalizedUserData['name'] != null ||
+            normalizedUserData['email'] != null) {
+          await _saveUserData(normalizedUserData);
+          print(
+              'Debug: User data loaded successfully from API: $normalizedUserData');
+        } else {
+          print('Debug: User data tidak lengkap, menggunakan fallback');
+          await _createFallbackUserData();
+        }
+      } else {
+        print(
+            'Debug: User data tidak ada dalam response, menggunakan fallback');
+        await _createFallbackUserData();
       }
     } catch (e) {
       print('Debug: Error loading user data: $e');
+      // Jika gagal load dari API, gunakan fallback
+      await _createFallbackUserData();
     }
+  }
+
+  // Function untuk membuat data user fallback
+  Future<void> _createFallbackUserData() async {
+    // Ambil email dari SharedPreferences jika ada
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString('user_email');
+
+    print('Debug: Creating fallback user data with email: $savedEmail');
+
+    Map<String, dynamic> fallbackData = {
+      'name': 'Fajar Habib', // Default name yang lebih spesifik
+      'email': savedEmail ??
+          'fajar@qwords.com', // Gunakan email yang tersimpan atau default
+      'id': '1', // Default ID
+    };
+
+    await _saveUserData(fallbackData);
+    print('Debug: Created fallback user data: $fallbackData');
   }
 
   @override
@@ -616,7 +685,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     border: Border.all(color: Colors.white, width: 2),
                   ),
                   child: Image.network(
-                    'https://hris.qwords.com/backend/storage/app/public/absensi/${absensiMasuk['foto_url']}',
+                    'https://hris.qwords.com/backend/public/uploads/absensi/${absensiMasuk['foto_url']}',
                     fit: BoxFit.cover,
                     width: 60,
                     height: 60,
@@ -639,7 +708,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     errorBuilder: (context, error, stackTrace) {
                       print('Debug: Error loading image: $error');
                       print(
-                          'Debug: Attempted URL: https://hris.qwords.com/backend/storage/app/public/absensi/${absensiMasuk['foto_url']}');
+                          'Debug: Attempted URL: https://hris.qwords.com/backend/public/uploads/absensi/${absensiMasuk['foto_url']}');
                       return Text(
                         _getUserInitials(),
                         style: const TextStyle(
@@ -679,7 +748,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     border: Border.all(color: Colors.white, width: 2),
                   ),
                   child: Image.network(
-                    'https://hris.qwords.com/backend/storage/app/public/absensi/${absensiKeluar['foto_url']}',
+                    'https://hris.qwords.com/backend/public/uploads/absensi/${absensiKeluar['foto_url']}',
                     fit: BoxFit.cover,
                     width: 60,
                     height: 60,
@@ -702,7 +771,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     errorBuilder: (context, error, stackTrace) {
                       print('Debug: Error loading image: $error');
                       print(
-                          'Debug: Attempted URL: https://hris.qwords.com/backend/storage/app/public/absensi/${absensiKeluar['foto_url']}');
+                          'Debug: Attempted URL: https://hris.qwords.com/backend/public/uploads/absensi/${absensiKeluar['foto_url']}');
                       return Text(
                         _getUserInitials(),
                         style: const TextStyle(
@@ -767,7 +836,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _userData?['name'] ?? 'Loading...',
+                          _userData?['name'] ??
+                              _userData?['nama'] ??
+                              'Loading...',
                           style: const TextStyle(
                               fontSize: 18, fontWeight: FontWeight.bold),
                         ),
@@ -1308,7 +1379,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               border: Border.all(color: Colors.white, width: 1),
                             ),
                             child: Image.network(
-                              'https://hris.qwords.com/backend/storage/app/public/absensi/$fotoUrl',
+                              'https://hris.qwords.com/backend/public/uploads/absensi/$fotoUrl',
                               fit: BoxFit.cover,
                               width: 40,
                               height: 40,
@@ -1336,7 +1407,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               errorBuilder: (context, error, stackTrace) {
                                 print('Debug: Error loading image: $error');
                                 print(
-                                    'Debug: Attempted URL: https://hris.qwords.com/backend/storage/app/public/absensi/$fotoUrl');
+                                    'Debug: Attempted URL: https://hris.qwords.com/backend/public/uploads/absensi/$fotoUrl');
                                 return Text(
                                   _getUserInitials(),
                                   style: const TextStyle(

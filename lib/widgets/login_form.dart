@@ -77,6 +77,13 @@ class _LoginFormState extends State<LoginForm> {
       // Simpan data user
       final prefs = await SharedPreferences.getInstance();
 
+      // Simpan token dan email
+      if (data['access_token'] != null) {
+        await prefs.setString('auth_token', data['access_token']);
+        await prefs.setString('user_email', _usernameController.text.trim());
+        print('Debug: Token dan email tersimpan');
+      }
+
       // Jika data user ada dalam response, simpan
       if (data['data'] != null) {
         await prefs.setString('user_data', jsonEncode(data['data']));

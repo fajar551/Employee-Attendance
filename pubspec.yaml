@@ -99,4 +99,4 @@ flutter:
 flutter_icons:
   android: true
   ios: false
-  image_path: "D:/flutter-test/dmeo_prj/assets/logo.jpg"
+  image_path: "D:/Flutter/Employee-Attendance/assets/logo.jpg"
