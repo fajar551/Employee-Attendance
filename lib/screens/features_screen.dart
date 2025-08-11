@@ -11,10 +11,140 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _isGridView = true; // State untuk toggle tampilan
 
+  // Data semua fitur - inisialisasi langsung
+  final List<Map<String, dynamic>> _allFeatures = [
+    // Waktu Kehadiran
+    {
+      'name': 'Daftar Kehadiran',
+      'icon': Icons.person,
+      'backgroundColor': Colors.green[100],
+      'iconColor': Colors.green[700],
+      'category': 'Waktu Kehadiran',
+    },
+    {
+      'name': 'Permintaan Koreksi Kehadiran',
+      'icon': Icons.access_time,
+      'backgroundColor': Colors.green[100],
+      'iconColor': Colors.green[700],
+      'category': 'Waktu Kehadiran',
+    },
+    {
+      'name': 'Jadwal Shift',
+      'icon': Icons.calendar_today,
+      'backgroundColor': Colors.green[100],
+      'iconColor': Colors.green[700],
+      'category': 'Waktu Kehadiran',
+    },
+    {
+      'name': 'Minta Jadwal Shift',
+      'icon': Icons.calendar_view_week,
+      'backgroundColor': Colors.green[100],
+      'iconColor': Colors.green[700],
+      'category': 'Waktu Kehadiran',
+    },
+
+    // Cuti
+    {
+      'name': 'Permintaan Cuti',
+      'icon': Icons.description,
+      'backgroundColor': Colors.blue[100],
+      'iconColor': Colors.blue[700],
+      'category': 'Cuti',
+    },
+    {
+      'name': 'Jatah Cuti',
+      'icon': Icons.description,
+      'backgroundColor': Colors.blue[100],
+      'iconColor': Colors.blue[700],
+      'category': 'Cuti',
+      'hasNotification': true,
+      'notificationCount': 2,
+    },
+    {
+      'name': 'Kalendar Cuti',
+      'icon': Icons.calendar_month,
+      'backgroundColor': Colors.blue[100],
+      'iconColor': Colors.blue[700],
+      'category': 'Cuti',
+    },
+
+    // Lembur
+    {
+      'name': 'Laporan Karyawan Lembur',
+      'icon': Icons.description,
+      'backgroundColor': Colors.purple[100],
+      'iconColor': Colors.purple[700],
+      'category': 'Lembur',
+    },
+    {
+      'name': 'Laporan Permintaan Lembur',
+      'icon': Icons.description,
+      'backgroundColor': Colors.purple[100],
+      'iconColor': Colors.purple[700],
+      'category': 'Lembur',
+    },
+    {
+      'name': 'Laporan Pembatalan Lembur',
+      'icon': Icons.description,
+      'backgroundColor': Colors.purple[100],
+      'iconColor': Colors.purple[700],
+      'category': 'Lembur',
+    },
+
+    // Perjalanan Bisnis
+    {
+      'name': 'Permintaan Perjalanan',
+      'icon': Icons.work,
+      'backgroundColor': Colors.orange[100],
+      'iconColor': Colors.orange[700],
+      'category': 'Perjalanan Bisnis',
+    },
+    {
+      'name': 'Laporan Perjalanan',
+      'icon': Icons.description,
+      'backgroundColor': Colors.orange[100],
+      'iconColor': Colors.orange[700],
+      'category': 'Perjalanan Bisnis',
+    },
+  ];
+
+  // Inisialisasi _filteredFeatures langsung
+  var _filteredFeatures = <Map<String, dynamic>>[];
+  bool _isSearching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    print('Debug: initState called');
+
+    // Gunakan addPostFrameCallback untuk memastikan widget sudah siap
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      print('Debug: Post frame callback executed');
+      _initializeFeatures();
+    });
+
+    print('Debug: initState completed');
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _initializeFeatures() {
+    print('Debug: Initializing features...');
+
+    // Tambahkan onTap callback ke setiap fitur
+    for (int i = 0; i < _allFeatures.length; i++) {
+      _allFeatures[i]['onTap'] =
+          () => _showFeatureInfo(_allFeatures[i]['name']);
+    }
+
+    _filteredFeatures = List.from(_allFeatures);
+    print('Debug: Features initialized. Total: ${_allFeatures.length}');
+    print(
+        'Debug: Feature names: ${_allFeatures.map((f) => f['name']).toList()}');
   }
 
   void _showFeatureInfo(String featureName) {
@@ -27,20 +157,47 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
   }
 
   void _searchFeatures(String query) {
-    if (query.isNotEmpty) {
-      // Implementasi pencarian fitur
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Mencari fitur: "$query"'),
-          backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 1),
-        ),
-      );
+    print('Debug: Searching for: "$query"');
+    print('Debug: Total features: ${_allFeatures.length}');
+    print(
+        'Debug: All feature names: ${_allFeatures.map((f) => f['name']).toList()}');
+
+    if (query.trim().isNotEmpty) {
+      setState(() {
+        _isSearching = true;
+        final searchQuery = query.trim().toLowerCase();
+
+        _filteredFeatures = _allFeatures.where((feature) {
+          final name = feature['name'] as String;
+          final category = feature['category'] as String;
+
+          final nameMatch = name.toLowerCase().contains(searchQuery);
+          final categoryMatch = category.toLowerCase().contains(searchQuery);
+
+          print(
+              'Debug: Checking "$name" - nameMatch: $nameMatch, categoryMatch: $categoryMatch');
+
+          return nameMatch || categoryMatch;
+        }).toList();
+      });
+
+      print('Debug: Found ${_filteredFeatures.length} results');
+      print(
+          'Debug: Results: ${_filteredFeatures.map((f) => f['name']).toList()}');
+    } else {
+      setState(() {
+        _isSearching = false;
+        _filteredFeatures = List.from(_allFeatures);
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    print('Debug: Build method called');
+    print('Debug: _allFeatures length: ${_allFeatures.length}');
+    print('Debug: _filteredFeatures length: ${_filteredFeatures.length}');
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -86,7 +243,6 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
               child: TextField(
                 controller: _searchController,
                 onChanged: (value) {
-                  // Implementasi pencarian fitur
                   _searchFeatures(value);
                 },
                 decoration: InputDecoration(
@@ -106,121 +262,10 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
               ),
             ),
 
-            // Waktu Kehadiran Section
-            _buildFeatureSection(
-              'Waktu Kehadiran',
-              [
-                _buildFeatureItem(
-                  'Daftar Kehadiran',
-                  Icons.person,
-                  Colors.green[100]!,
-                  Colors.green[700]!,
-                  () => _showFeatureInfo('Daftar Kehadiran'),
-                ),
-                _buildFeatureItem(
-                  'Permintaan Koreksi Kehadiran',
-                  Icons.access_time,
-                  Colors.green[100]!,
-                  Colors.green[700]!,
-                  () => _showFeatureInfo('Permintaan Koreksi Kehadiran'),
-                ),
-                _buildFeatureItem(
-                  'Jadwal Shift',
-                  Icons.calendar_today,
-                  Colors.green[100]!,
-                  Colors.green[700]!,
-                  () => _showFeatureInfo('Jadwal Shift'),
-                ),
-                _buildFeatureItem(
-                  'Minta Jadwal Shift',
-                  Icons.calendar_view_week,
-                  Colors.green[100]!,
-                  Colors.green[700]!,
-                  () => _showFeatureInfo('Minta Jadwal Shift'),
-                ),
-              ],
-            ),
-
-            // Cuti Section
-            _buildFeatureSection(
-              'Cuti',
-              [
-                _buildFeatureItem(
-                  'Permintaan Cuti',
-                  Icons.description,
-                  Colors.blue[100]!,
-                  Colors.blue[700]!,
-                  () => _showFeatureInfo('Permintaan Cuti'),
-                ),
-                _buildFeatureItem(
-                  'Jatah Cuti',
-                  Icons.description,
-                  Colors.blue[100]!,
-                  Colors.blue[700]!,
-                  () => _showFeatureInfo('Jatah Cuti'),
-                  hasNotification: true,
-                  notificationCount: 2,
-                ),
-                _buildFeatureItem(
-                  'Kalendar Cuti',
-                  Icons.calendar_month,
-                  Colors.blue[100]!,
-                  Colors.blue[700]!,
-                  () => _showFeatureInfo('Kalendar Cuti'),
-                ),
-              ],
-            ),
-
-            // Lembur Section
-            _buildFeatureSection(
-              'Lembur',
-              [
-                _buildFeatureItem(
-                  'Laporan Karyawan Lembur',
-                  Icons.description,
-                  Colors.purple[100]!,
-                  Colors.purple[700]!,
-                  () => _showFeatureInfo('Laporan Karyawan Lembur'),
-                ),
-                _buildFeatureItem(
-                  'Laporan Permintaan Lembur',
-                  Icons.description,
-                  Colors.purple[100]!,
-                  Colors.purple[700]!,
-                  () => _showFeatureInfo('Laporan Permintaan Lembur'),
-                ),
-                _buildFeatureItem(
-                  'Laporan Pembatalan Lembur',
-                  Icons.description,
-                  Colors.purple[100]!,
-                  Colors.purple[700]!,
-                  () => _showFeatureInfo('Laporan Pembatalan Lembur'),
-                ),
-              ],
-            ),
-
-            // Perjalanan Bisnis Section
-            _buildFeatureSection(
-              'Perjalanan Bisnis',
-              [
-                _buildFeatureItem(
-                  'Permintaan Perjalanan',
-                  Icons.work,
-                  Colors.orange[100]!,
-                  Colors.orange[700]!,
-                  () => _showFeatureInfo('Permintaan Perjalanan'),
-                ),
-                _buildFeatureItem(
-                  'Laporan Perjalanan',
-                  Icons.description,
-                  Colors.orange[100]!,
-                  Colors.orange[700]!,
-                  () => _showFeatureInfo('Laporan Perjalanan'),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 100), // Space for bottom navigation
+            // Tampilkan hasil pencarian atau tampilan normal
+            _searchController.text.isNotEmpty
+                ? _buildSearchResults()
+                : _buildNormalView(),
           ],
         ),
       ),
@@ -462,6 +507,228 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
           }
         },
       ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    print('Debug: Building search results');
+    print('Debug: Filtered features count: ${_filteredFeatures.length}');
+    print('Debug: Search text: "${_searchController.text}"');
+
+    if (_filteredFeatures.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(32),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(
+                Icons.search_off,
+                size: 64,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Tidak ada fitur yang ditemukan',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Coba kata kunci yang berbeda',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[500],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Kelompokkan hasil berdasarkan kategori
+    Map<String, List<Map<String, dynamic>>> groupedResults = {};
+    for (var feature in _filteredFeatures) {
+      String category = feature['category'] as String;
+      if (!groupedResults.containsKey(category)) {
+        groupedResults[category] = [];
+      }
+      groupedResults[category]!.add(feature);
+    }
+
+    return Column(
+      children: [
+        // Header hasil pencarian
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              const Text(
+                'Hasil Pencarian: ',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              Text(
+                '"${_searchController.text}" (${_filteredFeatures.length} item)',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Tampilkan hasil berdasarkan kategori
+        ...groupedResults.entries.map((entry) {
+          String category = entry.key;
+          List<Map<String, dynamic>> features = entry.value;
+
+          return _buildFeatureSection(
+            category,
+            features.map((feature) {
+              return _buildFeatureItem(
+                feature['name'] as String,
+                feature['icon'] as IconData,
+                feature['backgroundColor'] as Color,
+                feature['iconColor'] as Color,
+                feature['onTap'] as VoidCallback,
+                hasNotification: feature['hasNotification'] as bool? ?? false,
+                notificationCount: feature['notificationCount'] as int? ?? 0,
+              );
+            }).toList(),
+          );
+        }),
+
+        const SizedBox(height: 100), // Space for bottom navigation
+      ],
+    );
+  }
+
+  Widget _buildNormalView() {
+    return Column(
+      children: [
+        _buildFeatureSection(
+          'Waktu Kehadiran',
+          [
+            _buildFeatureItem(
+              'Daftar Kehadiran',
+              Icons.person,
+              Colors.green[100]!,
+              Colors.green[700]!,
+              () => _showFeatureInfo('Daftar Kehadiran'),
+            ),
+            _buildFeatureItem(
+              'Permintaan Koreksi Kehadiran',
+              Icons.access_time,
+              Colors.green[100]!,
+              Colors.green[700]!,
+              () => _showFeatureInfo('Permintaan Koreksi Kehadiran'),
+            ),
+            _buildFeatureItem(
+              'Jadwal Shift',
+              Icons.calendar_today,
+              Colors.green[100]!,
+              Colors.green[700]!,
+              () => _showFeatureInfo('Jadwal Shift'),
+            ),
+            _buildFeatureItem(
+              'Minta Jadwal Shift',
+              Icons.calendar_view_week,
+              Colors.green[100]!,
+              Colors.green[700]!,
+              () => _showFeatureInfo('Minta Jadwal Shift'),
+            ),
+          ],
+        ),
+
+        // Cuti Section
+        _buildFeatureSection(
+          'Cuti',
+          [
+            _buildFeatureItem(
+              'Permintaan Cuti',
+              Icons.description,
+              Colors.blue[100]!,
+              Colors.blue[700]!,
+              () => _showFeatureInfo('Permintaan Cuti'),
+            ),
+            _buildFeatureItem(
+              'Jatah Cuti',
+              Icons.description,
+              Colors.blue[100]!,
+              Colors.blue[700]!,
+              () => _showFeatureInfo('Jatah Cuti'),
+              hasNotification: true,
+              notificationCount: 2,
+            ),
+            _buildFeatureItem(
+              'Kalendar Cuti',
+              Icons.calendar_month,
+              Colors.blue[100]!,
+              Colors.blue[700]!,
+              () => _showFeatureInfo('Kalendar Cuti'),
+            ),
+          ],
+        ),
+
+        // Lembur Section
+        _buildFeatureSection(
+          'Lembur',
+          [
+            _buildFeatureItem(
+              'Laporan Karyawan Lembur',
+              Icons.description,
+              Colors.purple[100]!,
+              Colors.purple[700]!,
+              () => _showFeatureInfo('Laporan Karyawan Lembur'),
+            ),
+            _buildFeatureItem(
+              'Laporan Permintaan Lembur',
+              Icons.description,
+              Colors.purple[100]!,
+              Colors.purple[700]!,
+              () => _showFeatureInfo('Laporan Permintaan Lembur'),
+            ),
+            _buildFeatureItem(
+              'Laporan Pembatalan Lembur',
+              Icons.description,
+              Colors.purple[100]!,
+              Colors.purple[700]!,
+              () => _showFeatureInfo('Laporan Pembatalan Lembur'),
+            ),
+          ],
+        ),
+
+        // Perjalanan Bisnis Section
+        _buildFeatureSection(
+          'Perjalanan Bisnis',
+          [
+            _buildFeatureItem(
+              'Permintaan Perjalanan',
+              Icons.work,
+              Colors.orange[100]!,
+              Colors.orange[700]!,
+              () => _showFeatureInfo('Permintaan Perjalanan'),
+            ),
+            _buildFeatureItem(
+              'Laporan Perjalanan',
+              Icons.description,
+              Colors.orange[100]!,
+              Colors.orange[700]!,
+              () => _showFeatureInfo('Laporan Perjalanan'),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 100), // Space for bottom navigation
+      ],
     );
   }
 }
