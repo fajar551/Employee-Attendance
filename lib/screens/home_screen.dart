@@ -1498,6 +1498,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.white,
         selectedItemColor: const Color(0xFFF18222),
         unselectedItemColor: Colors.grey,
+        currentIndex: 0, // Home tab is selected
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Beranda'),
           BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'Fitur'),
@@ -1506,6 +1507,17 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.work), label: 'Ruang Kerja'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
         ],
+        onTap: (index) {
+          if (index == 1) {
+            Navigator.pushReplacementNamed(context, '/features');
+          } else if (index == 2) {
+            Navigator.pushReplacementNamed(context, '/posts');
+          } else if (index == 3) {
+            Navigator.pushReplacementNamed(context, '/workspace');
+          } else if (index == 4) {
+            Navigator.pushReplacementNamed(context, '/profile');
+          }
+        },
       ),
     );
   }
