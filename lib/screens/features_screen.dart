@@ -99,8 +99,8 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
                     borderSide: BorderSide.none,
                   ),
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                    horizontal: 5,
+                    vertical: 5,
                   ),
                 ),
               ),
@@ -230,23 +230,23 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
 
   Widget _buildFeatureSection(String title, List<Widget> children) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               title,
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
               ),
             ),
           ),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -260,8 +260,9 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
             ),
             child: _isGridView
                 ? Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: children,
+                    children: children
+                        .map((child) => Expanded(child: child))
+                        .toList(),
                   )
                 : Column(
                     children: children
@@ -290,57 +291,65 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
       onTap: onTap,
       child: _isGridView
           ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Stack(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: backgroundColor,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        icon,
-                        color: iconColor,
-                        size: 28,
-                      ),
+                Center(
+                  child: Container(
+                    width: 35,
+                    height: 35,
+                    decoration: BoxDecoration(
+                      color: backgroundColor,
+                      shape: BoxShape.circle,
                     ),
-                    if (hasNotification)
-                      Positioned(
-                        top: 0,
-                        right: 0,
-                        child: Container(
-                          width: 20,
-                          height: 20,
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
+                    child: Stack(
+                      children: [
+                        Center(
+                          child: Icon(
+                            icon,
+                            color: iconColor,
+                            size: 20,
                           ),
-                          child: Center(
-                            child: Text(
-                              notificationCount.toString(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                        ),
+                        if (hasNotification)
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: Container(
+                              width: 16,
+                              height: 16,
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  notificationCount.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 SizedBox(
-                  width: 80,
-                  child: Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                  width: 100, // Width lebih besar agar kata pertama sejajar
+                  height: 32, // Height konsisten untuk semua teks
+                  child: Center(
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
                     ),
                   ),
                 ),
@@ -348,61 +357,67 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
             )
           : Row(
               children: [
-                Stack(
-                  children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: backgroundColor,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        icon,
-                        color: iconColor,
-                        size: 24,
-                      ),
-                    ),
-                    if (hasNotification)
-                      Positioned(
-                        top: 0,
-                        right: 0,
-                        child: Container(
-                          width: 18,
-                          height: 18,
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
+                Center(
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: backgroundColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Icon(
+                            icon,
+                            color: iconColor,
+                            size: 20,
                           ),
-                          child: Center(
-                            child: Text(
-                              notificationCount.toString(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (hasNotification)
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                notificationCount.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     label,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 14,
                       fontWeight: FontWeight.w500,
                       color: Colors.black87,
                     ),
                   ),
                 ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  color: Colors.grey[400],
-                  size: 16,
+                Center(
+                  child: Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.grey[400],
+                    size: 14,
+                  ),
                 ),
               ],
             ),
