@@ -232,7 +232,8 @@ class _LoginFormState extends State<LoginForm> {
           // Checkboxes and Links
           Row(
             children: [
-              Expanded(
+              Flexible(
+                flex: 2,
                 child: Row(
                   children: [
                     Checkbox(
@@ -244,20 +245,34 @@ class _LoginFormState extends State<LoginForm> {
                       },
                       activeColor: Colors.orange,
                     ),
-                    const Text(
-                      'Biarkan saya tetap masuk',
-                      style: TextStyle(fontSize: 14),
+                    const Flexible(
+                      child: Text(
+                        'Biarkan saya tetap masuk',
+                        style: TextStyle(fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
               ),
-              TextButton(
-                onPressed: () {},
-                child: const Text(
-                  'Lupa Kata Sandi?',
-                  style: TextStyle(
-                    color: Colors.orange,
-                    fontSize: 14,
+              Flexible(
+                flex: 1,
+                child: Container(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {},
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Lupa Kata Sandi?',
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -278,7 +293,7 @@ class _LoginFormState extends State<LoginForm> {
               Expanded(
                 child: RichText(
                   text: const TextSpan(
-                    style: TextStyle(fontSize: 14, color: Colors.black),
+                    style: TextStyle(fontSize: 13, color: Colors.black),
                     children: [
                       TextSpan(
                           text:
@@ -339,73 +354,7 @@ class _LoginFormState extends State<LoginForm> {
                     ),
             ),
           ),
-
-          const SizedBox(height: 24),
-
-          // Separator
-          Row(
-            children: [
-              Expanded(child: Divider(color: Colors.grey[300])),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'Atau',
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-              ),
-              Expanded(child: Divider(color: Colors.grey[300])),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // Google Login Button
-          SizedBox(
-            height: 48,
-            child: OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.g_mobiledata,
-                  size: 24, color: Colors.orange),
-              label: const Text(
-                'Login Dengan Google',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.orange,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.orange),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Other Login Methods Button
-          SizedBox(
-            height: 48,
-            child: OutlinedButton(
-              onPressed: () {},
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.orange),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Login Dengan Cara Lain',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.orange,
-                ),
-              ),
-            ),
-          ),
+          // Footer
         ],
       ),
     );
