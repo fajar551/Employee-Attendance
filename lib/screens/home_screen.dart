@@ -6,12 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http; // Added for http
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/api_service.dart';
+
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -161,70 +162,56 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       print('Debug: Loading attendance history...');
 
-      final response = await http.get(
-        Uri.parse(
-            'https://hris.qwords.com/backend/public/api/getAbsensiHistoryAndroid'),
-        headers: {
-          'Authorization': 'Bearer $_authToken',
-          'Content-Type': 'application/json',
-        },
-      );
+      final responseData = await ApiService.getAttendanceHistory(_authToken!);
 
-      print('Debug: History response status: ${response.statusCode}');
-      print('Debug: History response body: ${response.body}');
+      print('Debug: History response data: $responseData');
 
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        final data = responseData['data'];
+      final data = responseData['data'];
 
-        // Convert API data ke format yang sesuai dengan UI
-        List<Map<String, dynamic>> historyList = [];
+      // Convert API data ke format yang sesuai dengan UI
+      List<Map<String, dynamic>> historyList = [];
 
-        // Iterate through each day
-        data.forEach((dayName, dayData) {
-          final absensiList = dayData['absensi'] as List;
+      // Iterate through each day
+      data.forEach((dayName, dayData) {
+        final absensiList = dayData['absensi'] as List;
 
-          // Convert each attendance record
-          for (var absensi in absensiList) {
-            final waktuAbsen = DateTime.parse(absensi['waktu_absen']);
+        // Convert each attendance record
+        for (var absensi in absensiList) {
+          final waktuAbsen = DateTime.parse(absensi['waktu_absen']);
 
-            historyList.add({
-              'date': _formatDate(waktuAbsen),
-              'time': _formatTime(waktuAbsen),
-              'hasLocation': true, // Semua data dari API memiliki lokasi
-              'status': 'Telah diproses',
-              'imageFile': null, // Foto disimpan di server, tidak di local
-              'foto_url': absensi['foto'], // URL foto dari server
-              'latitude': absensi['latitude'],
-              'longitude': absensi['longitude'],
-              'waktu_absen': absensi['waktu_absen'],
-              'flag': (absensi['flag'] is int)
-                  ? absensi['flag']
-                  : int.tryParse(absensi['flag'].toString()) ?? 1,
-            });
+          historyList.add({
+            'date': _formatDate(waktuAbsen),
+            'time': _formatTime(waktuAbsen),
+            'hasLocation': true, // Semua data dari API memiliki lokasi
+            'status': 'Telah diproses',
+            'imageFile': null, // Foto disimpan di server, tidak di local
+            'foto_url': absensi['foto'], // URL foto dari server
+            'latitude': absensi['latitude'],
+            'longitude': absensi['longitude'],
+            'waktu_absen': absensi['waktu_absen'],
+            'flag': (absensi['flag'] is int)
+                ? absensi['flag']
+                : int.tryParse(absensi['flag'].toString()) ?? 1,
+          });
 
-            // Debug print untuk foto
-            print('Debug: Foto URL: ${absensi['foto']}');
-          }
-        });
+          // Debug print untuk foto
+          print('Debug: Foto URL: ${absensi['foto']}');
+        }
+      });
 
-        // Sort by date (newest first)
-        historyList.sort((a, b) {
-          final dateA = DateTime.parse(a['waktu_absen']);
-          final dateB = DateTime.parse(b['waktu_absen']);
-          return dateB.compareTo(dateA);
-        });
+      // Sort by date (newest first)
+      historyList.sort((a, b) {
+        final dateA = DateTime.parse(a['waktu_absen']);
+        final dateB = DateTime.parse(b['waktu_absen']);
+        return dateB.compareTo(dateA);
+      });
 
-        setState(() {
-          _attendanceHistory = historyList;
-        });
-        _updateTodayFlag();
+      setState(() {
+        _attendanceHistory = historyList;
+      });
+      _updateTodayFlag();
 
-        print(
-            'Debug: History loaded successfully. Count: ${historyList.length}');
-      } else {
-        print('Debug: Failed to load history. Status: ${response.statusCode}');
-      }
+      print('Debug: History loaded successfully. Count: ${historyList.length}');
     } catch (e) {
       print('Debug: Error loading history: $e');
     } finally {
@@ -499,47 +486,14 @@ class _HomeScreenState extends State<HomeScreen> {
       print('Debug: Foto length: ${fotoBase64.length}');
 
       // Kirim request ke API
-      final response = await http.post(
-        Uri.parse('https://hris.qwords.com/backend/public/api/absensiAndroid'),
-        headers: {
-          'Authorization': 'Bearer $_authToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(requestData),
-      );
+      final responseData =
+          await ApiService.sendAttendance(_authToken!, requestData);
 
-      print('Debug: Response status: ${response.statusCode}');
-      print('Debug: Response body: ${response.body}');
+      print('Debug: Response data: $responseData');
 
-      if (response.statusCode == 200) {
-        // Berhasil
-        print('Absensi berhasil dikirim: ${response.body}');
-        return true;
-      } else if (response.statusCode == 403) {
-        // Gagal karena diluar jangkauan
-        try {
-          final errorData = jsonDecode(response.body);
-          final message =
-              errorData['message'] ?? 'Anda berada di luar jangkauan kantor';
-          final jarak = errorData['jarak']?.toString() ?? '';
-          final radius = errorData['radius']?.toString() ?? '';
-
-          // Throw exception dengan pesan yang spesifik
-          throw Exception('$message\nJarak: ${jarak}m, Radius: ${radius}m');
-        } catch (e) {
-          throw Exception('Anda berada di luar jangkauan kantor');
-        }
-      } else {
-        // Gagal karena alasan lain
-        try {
-          final errorData = jsonDecode(response.body);
-          final message = errorData['message'] ?? 'Gagal mengirim data absensi';
-          throw Exception(message);
-        } catch (e) {
-          throw Exception(
-              'Gagal mengirim data absensi. Status: ${response.statusCode}');
-        }
-      }
+      // Berhasil
+      print('Absensi berhasil dikirim: $responseData');
+      return true;
     } catch (e) {
       print('Error saat mengirim absensi: $e');
       // Re-throw exception agar bisa ditangkap di _pickImage
@@ -610,29 +564,15 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       print('Debug: Loading user data from API...');
 
-      final response = await http.get(
-        Uri.parse(
-            'https://hris.qwords.com/backend/public/api/dashboardAndroid'),
-        headers: {
-          'Authorization': 'Bearer $_authToken',
-          'Content-Type': 'application/json',
-        },
-      );
+      final responseData = await ApiService.getDashboardData(_authToken!);
 
-      print('Debug: User data response status: ${response.statusCode}');
-      print('Debug: User data response body: ${response.body}');
+      print('Debug: User data response data: $responseData');
 
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        final userData = responseData['data'];
+      final userData = responseData['data'];
 
-        if (userData != null) {
-          await _saveUserData(userData);
-          print('Debug: User data loaded successfully from API: $userData');
-        }
-      } else {
-        print(
-            'Debug: Failed to load user data. Status: ${response.statusCode}');
+      if (userData != null) {
+        await _saveUserData(userData);
+        print('Debug: User data loaded successfully from API: $userData');
       }
     } catch (e) {
       print('Debug: Error loading user data: $e');
@@ -1013,9 +953,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         elevation: 5, // bayangan di button rekam waktu
                       ),
                       child: _isLoading
-                          ? Row(
+                          ? const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              children: const [
+                              children: [
                                 SizedBox(
                                   width: 16,
                                   height: 16,
@@ -1058,9 +998,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             padding: const EdgeInsets.symmetric(
                                 vertical: 0, horizontal: 24),
                           ),
-                          child: Row(
+                          child: const Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: const [
+                            children: [
                               Text(
                                 'Lihat Detail',
                                 style: TextStyle(
@@ -1151,7 +1091,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               record['imageFile'],
                               record['foto_url'],
                             );
-                          }).toList(),
+                          }),
                           const SizedBox(height: 8),
                           Center(
                             child: TextButton(
@@ -1165,9 +1105,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 padding: const EdgeInsets.symmetric(
                                     vertical: 0, horizontal: 24),
                               ),
-                              child: Row(
+                              child: const Row(
                                 mainAxisSize: MainAxisSize.min,
-                                children: const [
+                                children: [
                                   Text(
                                     'Sembunyikan Detail',
                                     style: TextStyle(
