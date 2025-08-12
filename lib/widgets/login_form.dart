@@ -236,14 +236,18 @@ class _LoginFormState extends State<LoginForm> {
                 flex: 2,
                 child: Row(
                   children: [
-                    Checkbox(
-                      value: _keepMeLoggedIn,
-                      onChanged: (value) {
-                        setState(() {
-                          _keepMeLoggedIn = value ?? false;
-                        });
-                      },
-                      activeColor: Colors.orange,
+                    SizedBox(
+                      width: 32,
+                      child: Checkbox(
+                        value: _keepMeLoggedIn,
+                        onChanged: (value) {
+                          setState(() {
+                            _keepMeLoggedIn = value ?? false;
+                          });
+                        },
+                        activeColor: Colors.orange,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                     ),
                     const Flexible(
                       child: Text(
@@ -281,14 +285,18 @@ class _LoginFormState extends State<LoginForm> {
 
           Row(
             children: [
-              Checkbox(
-                value: _agreeToPrivacy,
-                onChanged: (value) {
-                  setState(() {
-                    _agreeToPrivacy = value ?? false;
-                  });
-                },
-                activeColor: Colors.orange,
+              SizedBox(
+                width: 32,
+                child: Checkbox(
+                  value: _agreeToPrivacy,
+                  onChanged: (value) {
+                    setState(() {
+                      _agreeToPrivacy = value ?? false;
+                    });
+                  },
+                  activeColor: Colors.orange,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
               ),
               Expanded(
                 child: RichText(

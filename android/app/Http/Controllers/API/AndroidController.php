@@ -80,11 +80,13 @@ class AndroidController extends Controller
 
         $data = $validator->validated();
 
-        // $kantorLat = -6.881233;
-        $kantorLat = 37.4219980;
-        // $kantorLng = 107.587617;
-        $kantorLng = -122.084;
-        $radius = 40000; // meter
+        // $kantorLat = 37.4219980;
+        // $kantorLng = -122.084;
+        // $radius = 40000; // meter
+
+        $kantorLat = -6.881233;
+        $kantorLng = 107.587617;
+        $radius = 100; // meter
 
         $jarak = $this->hitungJarak($kantorLat, $kantorLng, $data['latitude'], $data['longitude']);
 
@@ -118,7 +120,13 @@ class AndroidController extends Controller
         // Simpan foto
         $imageName = 'absensi_' . time() . '.png';
         $image = base64_decode(str_replace(' ', '+', str_replace('data:image/png;base64,', '', $data['foto'])));
-        Storage::disk('public')->put("absensi/{$imageName}", $image);
+        
+        $uploadPath = public_path('uploads/absensi');
+        if (!file_exists($uploadPath)) {
+            mkdir($uploadPath, 0755, true);
+        }
+        
+        file_put_contents($uploadPath . '/' . $imageName, $image);
 
         $absensi = Absensi::create([
             'user_id' => $userId,
