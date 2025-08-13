@@ -5,7 +5,10 @@ import 'package:flutter/material.dart';
 import 'screens/features_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/posts_screen.dart';
+import 'screens/profile_screen.dart';
 import 'screens/splash_screen.dart';
+import 'screens/workspace_screen.dart';
 
 class MyHttpOverrides extends HttpOverrides {
   @override
@@ -37,6 +40,9 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
         '/features': (context) => const FeaturesScreen(),
+        '/posts': (context) => const PostsScreen(),
+        '/workspace': (context) => const WorkspaceScreen(),
+        '/profile': (context) => const ProfileScreen(),
       },
       debugShowCheckedModeBanner: false,
     );

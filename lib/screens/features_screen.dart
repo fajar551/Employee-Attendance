@@ -226,7 +226,7 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
                   content: Text(_isGridView
                       ? 'Tampilan Grid aktif'
                       : 'Tampilan List aktif'),
-                  backgroundColor: Colors.green,
+                  backgroundColor: Colors.orange,
                   duration: const Duration(seconds: 1),
                 ),
               );
