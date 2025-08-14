@@ -12,9 +12,11 @@ use App\Models\Karyawan;
 use App\Models\StatusHadir;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Response;
 
 class IzinController extends Controller
 {
@@ -29,9 +31,9 @@ class IzinController extends Controller
             ->map(function ($item) {
                 $tanggalAwal = Carbon::parse($item->tanggal_awal);
                 $tanggalAkhir = Carbon::parse($item->tanggal_akhir);
-        
+
                 $item->jumlah_hari = $tanggalAwal->diffInDays($tanggalAkhir) + 1;
-        
+
                 return $item;
             });
 
@@ -55,25 +57,25 @@ class IzinController extends Controller
 
         if ($validator->fails()) {
             return response()->json($validator->errors(), 422);
-        }        
+        }
         $data = $validator->validated();
 
         // Simpan dokumen
         if ($request->hasFile('dokumen')) {
             $imageName = 'izin_' . time() . '.' . $request->file('dokumen')->getClientOriginalExtension();
-            
+
             $uploadPath = public_path('uploads/izin');
             if (!file_exists($uploadPath)) {
                 mkdir($uploadPath, 0755, true);
             }
-            
+
             $request->file('dokumen')->move($uploadPath, $imageName);
         }
 
         $tanggalAwal = Carbon::parse($data['tanggal_awal']);
         $tanggalAkhir = Carbon::parse($data['tanggal_akhir']);
         $jumlahCuti = $tanggalAwal->diffInDays($tanggalAkhir) + 1;
-        
+
         $izin = Izin::create([
             'karyawan_id' => auth()->user()->karyawan_id,
             'status_hadir_id' => $data['status_hadir_id'],
@@ -83,7 +85,7 @@ class IzinController extends Controller
             'keterangan' => $data['keterangan'],
             'dokumen' => $imageName,
         ]);
-        
+
         return response()->json([
             'data' => $izin,
             'message' => 'Izin berhasil'
@@ -94,16 +96,15 @@ class IzinController extends Controller
     {
         try {
             $izin = Izin::select('hr_cuti.*', 'hr_status_hadir.nama as nama_status_hadir', 'hr_users.nama as name_user_acc')
-            ->leftJoin('hr_status_hadir', 'hr_cuti.status_hadir_id', '=', 'hr_status_hadir.id')
-            ->leftJoin('hr_users', 'hr_users.id', '=', 'hr_cuti.personalia_id')
-            ->where('hr_cuti.id', $id)
-            ->first();
-            
+                ->leftJoin('hr_status_hadir', 'hr_cuti.status_hadir_id', '=', 'hr_status_hadir.id')
+                ->leftJoin('hr_users', 'hr_users.id', '=', 'hr_cuti.personalia_id')
+                ->where('hr_cuti.id', $id)
+                ->first();
+
             return response()->json([
                 'data' => $izin,
                 'message' => 'Data Success'
             ], 200);
-
         } catch (Exception $e) {
 
             return response()->json([
@@ -112,7 +113,7 @@ class IzinController extends Controller
         }
     }
 
-   public function update(Request $request, $id)
+    public function update(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
             'tanggal_awal' => 'required|date',
@@ -137,21 +138,20 @@ class IzinController extends Controller
             $izin->tanggal_awal = date('Y-m-d', strtotime($request->tanggal_awal));
             $izin->tanggal_akhir = date('Y-m-d', strtotime($request->tanggal_akhir));
             $izin->status_hadir_id = $request->status_hadir_id;
-            $izin->keterangan = $request->keterangan;   
+            $izin->keterangan = $request->keterangan;
             $izin->jumlah_cuti = $jumlahCuti;
             if ($request->hasFile('dokumen')) {
                 $imageName = 'izin_' . time() . '.' . $request->file('dokumen')->getClientOriginalExtension();
-                
+
                 $uploadPath = public_path('uploads/izin');
                 if (!file_exists($uploadPath)) {
                     mkdir($uploadPath, 0755, true);
                 }
-                
+
                 $request->file('dokumen')->move($uploadPath, $imageName);
                 $izin->dokumen = $imageName;
             }
             $izin->save();
-
         } catch (Exception $e) {
             DB::rollback();
             return response()->json(['warning' => 'Error : ' . $e->getMessage()], 500);
@@ -165,11 +165,11 @@ class IzinController extends Controller
         ], 200);
     }
 
-    public function delete($id) 
+    public function delete($id)
     {
         $izin = Izin::findOrFail($id);
         $izin->delete();
-        
+
         return response()->json([
             'data' => $izin,
             'message' => 'Delete Success'
@@ -208,7 +208,7 @@ class IzinController extends Controller
         if ($today->lt($startOfPeriod)) {
             $startOfPeriod->subYear();
         }
-        $endOfPeriod = $startOfPeriod->copy()->addYear()->subDay(); 
+        $endOfPeriod = $startOfPeriod->copy()->addYear()->subDay();
 
         $sisaCuti = Izin::select('hr_cuti.*')
             ->leftJoin('hr_status_hadir', 'hr_cuti.status_hadir_id', '=', 'hr_status_hadir.id')
@@ -222,7 +222,7 @@ class IzinController extends Controller
         $jatahCuti = Jabatan::leftJoin('karyawan', 'karyawan.jabatan_id', '=', 'jabatan.id')
             ->where('karyawan.id', auth()->user()->karyawan_id)
             ->value('jatah_cuti') ?? 12;
-            
+
         $sisaCutiAkhir = $jatahCuti - $sisaCuti;
 
         return response()->json([
@@ -266,7 +266,7 @@ class IzinController extends Controller
         if ($today->lt($startOfPeriod)) {
             $startOfPeriod->subYear();
         }
-        $endOfPeriod = $startOfPeriod->copy()->addYear()->subDay(); 
+        $endOfPeriod = $startOfPeriod->copy()->addYear()->subDay();
 
         $sisaCuti = Izin::select('hr_cuti.*')
             ->leftJoin('hr_status_hadir', 'hr_cuti.status_hadir_id', '=', 'hr_status_hadir.id')
@@ -325,29 +325,29 @@ class IzinController extends Controller
 
             // Ambil semua user HRD
             $usersHrd = User::select('hr_users.*')
-            ->leftJoin('hr_user_groups', 'hr_user_groups.id', '=', 'hr_users.user_group_id')
-            ->where('hr_user_groups.kode', 'HRD')
-            ->get();
+                ->leftJoin('hr_user_groups', 'hr_user_groups.id', '=', 'hr_users.user_group_id')
+                ->where('hr_user_groups.kode', 'HRD')
+                ->get();
 
             $tokens = [];
-            
+
             // Generate token untuk setiap user HRD
             foreach ($usersHrd as $userHrd) {
                 $token = Str::random(64);
-                
+
                 Cache::put("notification_token_{$token}", [
                     'izin_id' => $id,
                     'user_id' => $userHrd->id,
                     'created_at' => now()
                 ], now()->addHours(24));
-                
+
                 $tokens[] = [
                     'token' => $token,
                     'user_id' => $userHrd->id,
                     'user_name' => $userHrd->name ?? $userHrd->username ?? 'HRD User'
                 ];
             }
-            
+
             return response()->json([
                 'data' => [
                     'tokens' => $tokens,
@@ -367,9 +367,9 @@ class IzinController extends Controller
     {
         $data = $userId . '|' . time();
         $hash = base64_encode($data);
-        
+
         $hash = str_replace(['+', '/', '='], ['-', '_', ''], $hash);
-        
+
         return response()->json([
             'data' => $hash,
             'message' => 'Hash generated successfully'
@@ -380,31 +380,31 @@ class IzinController extends Controller
     {
         try {
             $hash = str_replace(['-', '_'], ['+', '/'], $hash);
-            
+
             $hash = str_pad($hash, strlen($hash) % 4, '=', STR_PAD_RIGHT);
-            
+
             $decoded = base64_decode($hash);
-            
+
             $parts = explode('|', $decoded);
             if (count($parts) === 2) {
                 $userId = $parts[0];
                 $timestamp = $parts[1];
-                
+
                 // Cek apakah timestamp masih valid (24 jam)
                 if (time() - $timestamp <= 86400) {
                     // Cek apakah user_id adalah user HRD yang valid
                     $userHrd = User::select('hr_users.id')
-                    ->leftJoin('hr_user_groups', 'hr_user_groups.id', '=', 'hr_users.user_group_id')
-                    ->where('hr_user_groups.kode', 'HRD')
-                    ->where('hr_users.id', $userId)
-                    ->first();
-                    
+                        ->leftJoin('hr_user_groups', 'hr_user_groups.id', '=', 'hr_users.user_group_id')
+                        ->where('hr_user_groups.kode', 'HRD')
+                        ->where('hr_users.id', $userId)
+                        ->first();
+
                     if ($userHrd) {
                         return $userId;
                     }
                 }
             }
-            
+
             return null;
         } catch (Exception $e) {
             return null;
@@ -415,41 +415,41 @@ class IzinController extends Controller
     {
         try {
             $token = $request->token;
-            
+
             if (!$token) {
                 return response()->json([
                     'message' => 'Token is required'
                 ], 400);
             }
-            
+
             $tokenData = Cache::get("notification_token_{$token}");
-            
+
             if (!$tokenData) {
                 return response()->json([
                     'message' => 'Invalid or expired token'
                 ], 401);
             }
-            
+
             $izin = Izin::select('hr_cuti.*', 'hr_status_hadir.nama as nama_status_hadir')
                 ->leftJoin('hr_status_hadir', 'hr_cuti.status_hadir_id', '=', 'hr_status_hadir.id')
                 ->where('hr_cuti.id', $tokenData['izin_id'])
                 ->first();
-            
+
             if (!$izin) {
                 return response()->json([
                     'message' => 'Izin not found'
                 ], 404);
             }
-            
+
             $user = User::find($tokenData['user_id']);
             if (!$user) {
                 return response()->json([
                     'message' => 'User not found'
                 ], 404);
             }
-            
+
             $accessToken = $user->createToken('notification_token')->plainTextToken;
-            
+
             return response()->json([
                 'data' => [
                     'izin' => $izin,
@@ -470,37 +470,37 @@ class IzinController extends Controller
         try {
             $izinId = $request->izin_id;
             $userHash = $request->user_hash;
-            
-            \Log::info('Auto login attempt', [
+
+            Log::info('Auto login attempt', [
                 'izin_id' => $izinId,
                 'user_hash' => $userHash
             ]);
-            
+
             if (!$izinId) {
                 return response()->json([
                     'message' => 'Izin ID is required'
                 ], 400);
             }
-            
+
             // Ambil semua user HRD
             $usersHrd = User::select('hr_users.*')
-            ->leftJoin('hr_user_groups', 'hr_user_groups.id', '=', 'hr_users.user_group_id')
-            ->where('hr_user_groups.kode', 'HRD')
-            ->get();
-            
-            \Log::info('HRD users found', ['count' => $usersHrd->count()]);
-            
+                ->leftJoin('hr_user_groups', 'hr_user_groups.id', '=', 'hr_users.user_group_id')
+                ->where('hr_user_groups.kode', 'HRD')
+                ->get();
+
+            Log::info('HRD users found', ['count' => $usersHrd->count()]);
+
             if ($usersHrd->isEmpty()) {
                 return response()->json([
                     'message' => 'No HRD users found'
                 ], 404);
             }
-            
+
             // Jika ada user_hash, decode untuk mendapatkan user_id
             if ($userHash) {
                 $userId = $this->decodeUserId($userHash);
-                \Log::info('Decoded user_id', ['user_id' => $userId]);
-                
+                Log::info('Decoded user_id', ['user_id' => $userId]);
+
                 if ($userId) {
                     $userHrd = $usersHrd->where('id', $userId)->first();
                     if (!$userHrd) {
@@ -511,32 +511,32 @@ class IzinController extends Controller
                 } else {
                     // Fallback ke user HRD pertama jika hash tidak valid
                     $userHrd = $usersHrd->first();
-                    \Log::warning('Invalid user hash, using first HRD user', ['user_id' => $userHrd->id]);
+                    Log::warning('Invalid user hash, using first HRD user', ['user_id' => $userHrd->id]);
                 }
             } else {
                 // Jika tidak ada user_hash, ambil user HRD pertama sebagai default
                 $userHrd = $usersHrd->first();
-                \Log::info('No user hash, using first HRD user', ['user_id' => $userHrd->id]);
+                Log::info('No user hash, using first HRD user', ['user_id' => $userHrd->id]);
             }
-            
+
             $izin = Izin::select('hr_cuti.*', 'hr_status_hadir.nama as nama_status_hadir')
                 ->leftJoin('hr_status_hadir', 'hr_cuti.status_hadir_id', '=', 'hr_status_hadir.id')
                 ->where('hr_cuti.id', $izinId)
                 ->first();
-            
+
             if (!$izin) {
                 return response()->json([
                     'message' => 'Izin not found'
                 ], 404);
             }
-            
+
             $accessToken = $userHrd->createToken('notification_token')->plainTextToken;
-            
-            \Log::info('Auto login successful', [
+
+            Log::info('Auto login successful', [
                 'user_id' => $userHrd->id,
                 'izin_id' => $izinId
             ]);
-            
+
             return response()->json([
                 'data' => [
                     'izin' => $izin,
@@ -547,18 +547,19 @@ class IzinController extends Controller
                 'message' => 'Auto login successful'
             ], 200);
         } catch (Exception $e) {
-            \Log::error('Auto login error', [
+            Log::error('Auto login error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             return response()->json([
                 'message' => 'Error auto login: ' . $e->getMessage()
             ], 500);
         }
     }
 
-    public function getUserHrd(){
+    public function getUserHrd()
+    {
         $userHrd = User::select('hr_users.*', 'karyawan.no_telepon')
             ->leftJoin('karyawan', 'karyawan.id', '=', 'hr_users.karyawan_id')
             ->leftJoin('hr_user_groups', 'hr_user_groups.id', '=', 'hr_users.user_group_id')
@@ -571,7 +572,8 @@ class IzinController extends Controller
         ], 200);
     }
 
-    public function getUserHrdAcc(){
+    public function getUserHrdAcc()
+    {
         $userHrd = User::select('hr_users.*', 'karyawan.no_telepon')
             ->leftJoin('karyawan', 'karyawan.id', '=', 'hr_users.karyawan_id')
             ->leftJoin('hr_user_groups', 'hr_user_groups.id', '=', 'hr_users.user_group_id')
