@@ -148,12 +148,16 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
   }
 
   void _showFeatureInfo(String featureName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Fitur "$featureName" akan segera tersedia.'),
-        backgroundColor: Colors.blue,
-      ),
-    );
+    if (featureName == 'Permintaan Cuti') {
+      Navigator.pushNamed(context, '/izin');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Fitur "$featureName" akan segera tersedia.'),
+          backgroundColor: Colors.blue,
+        ),
+      );
+    }
   }
 
   void _searchFeatures(String query) {

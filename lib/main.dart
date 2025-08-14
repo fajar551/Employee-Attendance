@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'screens/features_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/izin_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/posts_screen.dart';
 import 'screens/profile_screen.dart';
@@ -40,6 +41,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
         '/features': (context) => const FeaturesScreen(),
+        '/izin': (context) => const IzinScreen(),
         '/posts': (context) => const PostsScreen(),
         '/workspace': (context) => const WorkspaceScreen(),
         '/profile': (context) => const ProfileScreen(),
