@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -431,15 +432,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: const Text('Batal'),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(context).pop();
-                // Implementasi logout di sini
+                // Clear semua data user
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('auth_token');
+                await prefs.remove('user_data');
+                await prefs.remove('user_email');
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Anda telah keluar'),
                     backgroundColor: Colors.red,
                   ),
                 );
+
+                // Redirect ke login screen
+                if (context.mounted) {
+                  Navigator.pushReplacementNamed(context, '/login');
+                }
               },
               child: const Text(
                 'Keluar',

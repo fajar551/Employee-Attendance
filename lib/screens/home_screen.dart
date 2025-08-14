@@ -155,17 +155,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Function untuk clear token
-  Future<void> _clearAuthToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
-    await prefs.remove('user_data'); // Juga hapus data user
-    setState(() {
-      _authToken = null;
-      _userData = null;
-    });
-  }
-
   // Function untuk mengambil data history absensi dari API
   Future<void> _loadAttendanceHistory() async {
     if (_authToken == null || _authToken!.isEmpty) {
@@ -1568,14 +1557,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _logout() {
-    _clearAuthToken(); // Clear token sebelum keluar
+  void _logout() async {
+    // Clear semua data user
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    await prefs.remove('user_data');
+    await prefs.remove('user_email');
+
     // Navigate back to login screen
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      '/login',
-      (route) => false,
-    );
+    if (context.mounted) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/login',
+        (route) => false,
+      );
+    }
   }
 
   Widget _buildFavoriteMenuItem(
