@@ -1,9 +1,11 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../services/api_service.dart';
 
 class IzinScreen extends StatefulWidget {
   const IzinScreen({super.key});
@@ -22,6 +24,7 @@ class _IzinScreenState extends State<IzinScreen> {
   File? _selectedFile;
   String? _fileName;
   bool _isLoading = false;
+  bool _isLoadingStatusHadir = false; // Loading state untuk status hadir
   List<Map<String, dynamic>> _statusHadirList = [];
 
   @override
@@ -39,25 +42,36 @@ class _IzinScreenState extends State<IzinScreen> {
   }
 
   Future<void> _loadStatusHadir() async {
-    try {
-      // Ganti dengan URL API yang sesuai
-      final response = await http.get(
-        Uri.parse('https://hris.qwords.com/backend/public/api/status-hadir'),
-        headers: {
-          'Authorization':
-              'Bearer 42|PNraUzN71CWvLtZ1zqe4LoD8aJdR5kk1pJlzyX6I7570712a',
-          'Content-Type': 'application/json',
-        },
-      );
+    setState(() {
+      _isLoadingStatusHadir = true;
+    });
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      if (token == null) {
+        print('Debug: Token tidak ditemukan');
+        return;
+      }
+
+      final responseData = await ApiService.getStatusHadir(token);
+
+      if (responseData['data'] != null) {
         setState(() {
-          _statusHadirList = List<Map<String, dynamic>>.from(data['data']);
+          _statusHadirList =
+              List<Map<String, dynamic>>.from(responseData['data']);
         });
+        print('Debug: Status hadir loaded: ${_statusHadirList.length} items');
+      } else {
+        print('Debug: Error loading status hadir. Response: $responseData');
       }
     } catch (e) {
       print('Error loading status hadir: $e');
+    } finally {
+      setState(() {
+        _isLoadingStatusHadir = false;
+      });
     }
   }
 
@@ -101,7 +115,7 @@ class _IzinScreenState extends State<IzinScreen> {
     if (_selectedStatusHadir == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Pilih status hadir terlebih dahulu'),
+          content: Text('Pilih tipe izin terlebih dahulu'),
           backgroundColor: Colors.red,
         ),
       );
@@ -113,21 +127,31 @@ class _IzinScreenState extends State<IzinScreen> {
     });
 
     try {
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('https://hris.qwords.com/backend/public/api/izin'),
-      );
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
 
-      request.headers['Authorization'] =
-          'Bearer 42|PNraUzN71CWvLtZ1zqe4LoD8aJdR5kk1pJlzyX6I7570712a';
+      if (token == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Token tidak ditemukan, silakan login ulang'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
 
-      request.fields['tanggal_awal'] = _tanggalAwalController.text;
-      request.fields['tanggal_akhir'] = _tanggalAkhirController.text;
-      request.fields['status_hadir_id'] = _selectedStatusHadir!;
-      request.fields['keterangan'] = _keteranganController.text;
+      // Prepare fields
+      Map<String, String> fields = {
+        'tanggal_awal': _tanggalAwalController.text,
+        'tanggal_akhir': _tanggalAkhirController.text,
+        'status_hadir_id': _selectedStatusHadir!,
+        'keterangan': _keteranganController.text,
+      };
 
+      // Prepare files
+      List<http.MultipartFile> files = [];
       if (_selectedFile != null) {
-        request.files.add(
+        files.add(
           await http.MultipartFile.fromPath(
             'dokumen',
             _selectedFile!.path,
@@ -136,15 +160,13 @@ class _IzinScreenState extends State<IzinScreen> {
         );
       }
 
-      final response = await request.send();
-      final responseData = await response.stream.bytesToString();
+      final responseData = await ApiService.submitIzin(token, fields, files);
 
-      if (response.statusCode == 200) {
-        final data = json.decode(responseData);
+      if (responseData['message'] != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(data['message'] ?? 'Izin berhasil diajukan'),
-            backgroundColor: Colors.green,
+            content: Text(responseData['message'] ?? 'Izin berhasil diajukan'),
+            backgroundColor: Colors.orange,
           ),
         );
 
@@ -155,11 +177,17 @@ class _IzinScreenState extends State<IzinScreen> {
           _fileName = null;
           _selectedStatusHadir = null;
         });
+
+        // Redirect ke features screen setelah berhasil
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/features');
+          }
+        });
       } else {
-        final errorData = json.decode(responseData);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorData['message'] ?? 'Terjadi kesalahan'),
+            content: Text(responseData['message'] ?? 'Terjadi kesalahan'),
             backgroundColor: Colors.red,
           ),
         );
@@ -199,7 +227,7 @@ class _IzinScreenState extends State<IzinScreen> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 16),
         child: Form(
           key: _formKey,
           child: Column(
@@ -207,6 +235,7 @@ class _IzinScreenState extends State<IzinScreen> {
             children: [
               // Header
               Container(
+                margin: const EdgeInsets.symmetric(horizontal: 8),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.orange[50],
@@ -300,7 +329,7 @@ class _IzinScreenState extends State<IzinScreen> {
 
               // Status Hadir
               const Text(
-                'Status Hadir',
+                'Tipe Izin',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -312,28 +341,90 @@ class _IzinScreenState extends State<IzinScreen> {
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey[300]!),
                   borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
                 ),
-                child: DropdownButtonFormField<String>(
-                  value: _selectedStatusHadir,
-                  decoration: const InputDecoration(
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    border: InputBorder.none,
-                    prefixIcon: Icon(Icons.category),
-                  ),
-                  hint: const Text('Pilih status hadir'),
-                  items: _statusHadirList.map((status) {
-                    return DropdownMenuItem<String>(
-                      value: status['id'].toString(),
-                      child: Text(status['nama'] ?? 'Unknown'),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedStatusHadir = value;
-                    });
-                  },
-                ),
+                child: _isLoadingStatusHadir
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 16),
+                        child: const Row(
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            SizedBox(width: 12),
+                            Text(
+                              'Memuat tipe izin...',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      )
+                    : DropdownButtonFormField<String>(
+                        value: _selectedStatusHadir,
+                        decoration: const InputDecoration(
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 16),
+                          border: InputBorder.none,
+                          hintText: 'Pilih tipe izin',
+                          hintStyle: TextStyle(color: Colors.grey),
+                        ),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Colors.black87,
+                        ),
+                        icon: const Icon(Icons.keyboard_arrow_down,
+                            color: Colors.grey),
+                        dropdownColor: Colors.white,
+                        items: _statusHadirList.isEmpty
+                            ? [
+                                const DropdownMenuItem<String>(
+                                  value: null,
+                                  child: Text(
+                                    'Tidak ada data tipe izin',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ),
+                              ]
+                            : _statusHadirList.map((status) {
+                                return DropdownMenuItem<String>(
+                                  value: status['id'].toString(),
+                                  child: Container(
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 4),
+                                    child: Text(
+                                      status['nama'] ?? 'Unknown',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black87,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                        onChanged: _statusHadirList.isEmpty
+                            ? null
+                            : (value) {
+                                setState(() {
+                                  _selectedStatusHadir = value;
+                                });
+                              },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Tipe izin harus dipilih';
+                          }
+                          return null;
+                        },
+                        menuMaxHeight: 200,
+                        isExpanded: true,
+                      ),
               ),
 
               const SizedBox(height: 16),
@@ -381,7 +472,7 @@ class _IzinScreenState extends State<IzinScreen> {
               const SizedBox(height: 8),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey[300]!),
                   borderRadius: BorderRadius.circular(12),
@@ -462,35 +553,38 @@ class _IzinScreenState extends State<IzinScreen> {
               const SizedBox(height: 32),
 
               // Submit Button
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _submitIzin,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange[600],
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _submitIzin,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange[600],
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Ajukan Izin',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Text(
-                          'Ajukan Izin',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                 ),
               ),
             ],

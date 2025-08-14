@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../services/api_service.dart';
 
 class FeaturesScreen extends StatefulWidget {
   const FeaturesScreen({super.key});
@@ -10,6 +13,8 @@ class FeaturesScreen extends StatefulWidget {
 class _FeaturesScreenState extends State<FeaturesScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _isGridView = true; // State untuk toggle tampilan
+  int _sisaCuti = 0; // Sisa cuti dari API
+  bool _isLoadingSisaCuti = false; // Loading state untuk sisa cuti
 
   // Data semua fitur - inisialisasi langsung
   final List<Map<String, dynamic>> _allFeatures = [
@@ -57,8 +62,8 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
       'backgroundColor': Colors.blue[100],
       'iconColor': Colors.blue[700],
       'category': 'Cuti',
-      'hasNotification': true,
-      'notificationCount': 2,
+      'hasNotification': true, // Akan diupdate secara dinamis
+      'notificationCount': 2, // Akan diupdate secara dinamis
     },
     {
       'name': 'Kalendar Cuti',
@@ -121,9 +126,72 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       print('Debug: Post frame callback executed');
       _initializeFeatures();
+      _loadSisaCuti(); // Load sisa cuti dari API
     });
 
     print('Debug: initState completed');
+  }
+
+  // Function untuk mengambil sisa cuti dari API
+  Future<void> _loadSisaCuti() async {
+    setState(() {
+      _isLoadingSisaCuti = true;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      if (token == null) {
+        print('Debug: Token tidak ditemukan');
+        return;
+      }
+
+      final responseData = await ApiService.getSisaCuti(token);
+
+      if (responseData['data'] != null) {
+        setState(() {
+          _sisaCuti = responseData['data'] ?? 0;
+        });
+        print('Debug: Sisa cuti loaded: $_sisaCuti');
+
+        // Update features setelah data sisa cuti dimuat
+        _updateJatahCutiData();
+      } else {
+        print('Debug: Error loading sisa cuti. Response: $responseData');
+      }
+    } catch (e) {
+      print('Error loading sisa cuti: $e');
+    } finally {
+      setState(() {
+        _isLoadingSisaCuti = false;
+      });
+    }
+  }
+
+  // Function untuk memperbarui data Jatah Cuti
+  void _updateJatahCutiData() {
+    // Update data Jatah Cuti dengan data dinamis
+    for (int i = 0; i < _allFeatures.length; i++) {
+      if (_allFeatures[i]['name'] == 'Jatah Cuti') {
+        _allFeatures[i]['hasNotification'] = _sisaCuti > 0;
+        _allFeatures[i]['notificationCount'] = _sisaCuti;
+        break;
+      }
+    }
+
+    // Update filtered features juga
+    for (int i = 0; i < _filteredFeatures.length; i++) {
+      if (_filteredFeatures[i]['name'] == 'Jatah Cuti') {
+        _filteredFeatures[i]['hasNotification'] = _sisaCuti > 0;
+        _filteredFeatures[i]['notificationCount'] = _sisaCuti;
+        break;
+      }
+    }
+
+    setState(() {
+      // Trigger rebuild untuk menampilkan data terbaru
+    });
   }
 
   @override
@@ -139,6 +207,16 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
     for (int i = 0; i < _allFeatures.length; i++) {
       _allFeatures[i]['onTap'] =
           () => _showFeatureInfo(_allFeatures[i]['name']);
+    }
+
+    // Update data Jatah Cuti dengan data dinamis
+    for (int i = 0; i < _allFeatures.length; i++) {
+      if (_allFeatures[i]['name'] == 'Jatah Cuti') {
+        _allFeatures[i]['hasNotification'] = _sisaCuti > 0;
+        _allFeatures[i]['notificationCount'] =
+            _isLoadingSisaCuti ? 0 : _sisaCuti;
+        break;
+      }
     }
 
     _filteredFeatures = List.from(_allFeatures);
@@ -669,8 +747,10 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
               Colors.blue[100]!,
               Colors.blue[700]!,
               () => _showFeatureInfo('Jatah Cuti'),
-              hasNotification: true,
-              notificationCount: 2,
+              hasNotification:
+                  _sisaCuti > 0, // Tampilkan notifikasi jika ada sisa cuti
+              notificationCount:
+                  _isLoadingSisaCuti ? 0 : _sisaCuti, // Gunakan data dari API
             ),
             _buildFeatureItem(
               'Kalendar Cuti',
