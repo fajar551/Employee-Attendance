@@ -67,6 +67,40 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> getListCuti(String token) async {
+    try {
+      return await _makeRequest('$baseUrl/izin', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    } catch (e) {
+      print('List cuti dengan domain gagal, mencoba dengan IP address: $e');
+      return await _makeRequest('$fallbackUrl/izin', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    }
+  }
+
+  static Future<Map<String, dynamic>> getDetailCuti(
+      String token, int id) async {
+    try {
+      return await _makeRequest('$baseUrl/izin/$id', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    } catch (e) {
+      print('Detail cuti dengan domain gagal, mencoba dengan IP address: $e');
+      return await _makeRequest('$fallbackUrl/izin/$id', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    }
+  }
+
+  static Future<Map<String, dynamic>> getAllIzin(String token) async {
+    try {
+      return await _makeRequest('$baseUrl/allIzin', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    } catch (e) {
+      print('All izin dengan domain gagal, mencoba dengan IP address: $e');
+      return await _makeRequest('$fallbackUrl/allIzin', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    }
+  }
+
   static Future<Map<String, dynamic>> getStatusHadir(String token) async {
     try {
       return await _makeRequest('$baseUrl/izin/getDataStatusHadir', 'GET',
@@ -91,6 +125,91 @@ class ApiService {
           headers: {'Authorization': 'Bearer $token'},
           fields: fields,
           files: files);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getUserHrdAcc(String token) async {
+    try {
+      return await _makeRequest('$baseUrl/izin/getUserHrdAcc', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    } catch (e) {
+      print('Get user HRD dengan domain gagal, mencoba dengan IP address: $e');
+      return await _makeRequest('$fallbackUrl/izin/getUserHrdAcc', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    }
+  }
+
+  static Future<Map<String, dynamic>> approveIzin(
+      String token, int izinId) async {
+    try {
+      return await _makeRequest('$baseUrl/izin/approve/$izinId', 'POST',
+          headers: {'Authorization': 'Bearer $token'});
+    } catch (e) {
+      print('Approve izin dengan domain gagal, mencoba dengan IP address: $e');
+      return await _makeRequest('$fallbackUrl/izin/approve/$izinId', 'POST',
+          headers: {'Authorization': 'Bearer $token'});
+    }
+  }
+
+  static Future<Map<String, dynamic>> rejectIzin(
+      String token, int izinId, String keterangan) async {
+    try {
+      return await _makeRequest('$baseUrl/izin/reject/$izinId', 'POST',
+          headers: {'Authorization': 'Bearer $token'},
+          body: {'keterangan': keterangan});
+    } catch (e) {
+      print('Reject izin dengan domain gagal, mencoba dengan IP address: $e');
+      return await _makeRequest('$fallbackUrl/izin/reject/$izinId', 'POST',
+          headers: {'Authorization': 'Bearer $token'},
+          body: {'keterangan': keterangan});
+    }
+  }
+
+  static Future<Map<String, dynamic>> getRole(String token) async {
+    try {
+      return await _makeRequest('$baseUrl/role', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    } catch (e) {
+      print('Get role dengan domain gagal, mencoba dengan IP address: $e');
+      return await _makeRequest('$fallbackUrl/izin/getRole', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    }
+  }
+
+  static Future<Map<String, dynamic>> getProfileKaryawan(String token) async {
+    try {
+      return await _makeRequest('$baseUrl/izin/getProfileKaryawan', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    } catch (e) {
+      print(
+          'Get profile karyawan dengan domain gagal, mencoba dengan IP address: $e');
+      return await _makeRequest('$fallbackUrl/izin/getProfileKaryawan', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    }
+  }
+
+  static Future<Map<String, dynamic>> getAllKaryawan(String token) async {
+    try {
+      return await _makeRequest('$baseUrl/getAllKaryawan', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    } catch (e) {
+      print(
+          'Get all karyawan dengan domain gagal, mencoba dengan IP address: $e');
+      return await _makeRequest('$fallbackUrl/izin/getAllKaryawan', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    }
+  }
+
+  static Future<Map<String, dynamic>> getKaryawanById(
+      String token, int id) async {
+    try {
+      return await _makeRequest('$baseUrl/getKaryawanById/$id', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    } catch (e) {
+      print(
+          'Get karyawan by ID dengan domain gagal, mencoba dengan IP address: $e');
+      return await _makeRequest('$fallbackUrl/getKaryawanById/$id', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
     }
   }
 

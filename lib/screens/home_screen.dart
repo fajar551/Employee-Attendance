@@ -34,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic>? _userData; // Data user dari login
   final bool _showAllHistory = false;
   bool _showHistorySection = true;
+  String? _userRole; // Role user
 
   @override
   void initState() {
@@ -97,9 +98,44 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } else {
       await _loadAttendanceHistory();
+      await _loadUserRole(); // Load role user
       if (_userData == null || _userData!['name'] == null) {
         await _loadUserDataFromAPI();
       }
+    }
+  }
+
+  // Function untuk load role user dari API
+  Future<void> _loadUserRole() async {
+    if (_authToken == null || _authToken!.isEmpty) {
+      print('Debug: Token tidak ada, tidak bisa load role');
+      return;
+    }
+
+    try {
+      print('Debug: Loading user role from API...');
+
+      final responseData = await ApiService.getRole(_authToken!);
+
+      print('Debug: Role response data: $responseData');
+
+      if (responseData['data'] != null &&
+          responseData['data']['role_name'] != null) {
+        setState(() {
+          _userRole = responseData['data']['role_name'];
+        });
+        print('Debug: User role loaded successfully: $_userRole');
+      } else {
+        print('Debug: Role data tidak ditemukan dalam response');
+        setState(() {
+          _userRole = 'User'; // Default role
+        });
+      }
+    } catch (e) {
+      print('Debug: Error loading user role: $e');
+      setState(() {
+        _userRole = 'User'; // Default role jika error
+      });
     }
   }
 
@@ -701,7 +737,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       return Text(
                         _getUserInitials(),
                         style: const TextStyle(
-                          color: Colors.orange,
+                          color: Color(0xFFF97316),
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -764,7 +800,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       return Text(
                         _getUserInitials(),
                         style: const TextStyle(
-                          color: Colors.orange,
+                          color: Color(0xFFF97316),
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -832,9 +868,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          _userData?['email'] ??
-                              _userData?['id'] ??
-                              'Loading...',
+                          _userRole ?? 'Loading...',
                           style: const TextStyle(color: Colors.grey),
                         ),
                       ],
@@ -1005,7 +1039,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _pickImage,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF18222),
+                        backgroundColor: const Color(0xFFF97316),
                         padding: const EdgeInsets.symmetric(vertical: 7),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -1054,7 +1088,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             });
                           },
                           style: TextButton.styleFrom(
-                            foregroundColor: Colors.orange,
+                            foregroundColor: const Color(0xFFF97316),
                             padding: const EdgeInsets.symmetric(
                                 vertical: 0, horizontal: 24),
                           ),
@@ -1064,7 +1098,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               Text(
                                 'Lihat Detail',
                                 style: TextStyle(
-                                  color: Color(0xFFF18222),
+                                  color: Color(0xFFF97316),
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                 ),
@@ -1072,7 +1106,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               SizedBox(width: 4),
                               Icon(
                                 Icons.expand_more,
-                                color: Colors.orange,
+                                color: Color(0xFFF97316),
                               ),
                             ],
                           ),
@@ -1161,7 +1195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 });
                               },
                               style: TextButton.styleFrom(
-                                foregroundColor: Colors.orange,
+                                foregroundColor: const Color(0xFFF97316),
                                 padding: const EdgeInsets.symmetric(
                                     vertical: 0, horizontal: 24),
                               ),
@@ -1171,7 +1205,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   Text(
                                     'Sembunyikan Detail',
                                     style: TextStyle(
-                                      color: Color(0xFFF18222),
+                                      color: Color(0xFFF97316),
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,
                                     ),
@@ -1179,7 +1213,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   SizedBox(width: 4),
                                   Icon(
                                     Icons.expand_less,
-                                    color: Colors.orange,
+                                    color: Color(0xFFF97316),
                                   ),
                                 ],
                               ),
@@ -1284,7 +1318,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: isSelected ? Colors.orange[100] : Colors.white,
+        color: isSelected ? const Color(0xFFFEF3C7) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.grey[300]!),
       ),
@@ -1294,7 +1328,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             title,
             style: TextStyle(
-              color: isSelected ? Colors.orange[700] : Colors.grey[600],
+              color: isSelected ? const Color(0xFFF97316) : Colors.grey[600],
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
@@ -1400,7 +1434,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 return Text(
                                   _getUserInitials(),
                                   style: const TextStyle(
-                                    color: Colors.orange,
+                                    color: Color(0xFFF97316),
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -1412,7 +1446,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       : Text(
                           _getUserInitials(),
                           style: const TextStyle(
-                            color: Colors.orange,
+                            color: Color(0xFFF97316),
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1485,25 +1519,18 @@ class _HomeScreenState extends State<HomeScreen> {
       child: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
-        selectedItemColor: const Color(0xFFF18222),
+        selectedItemColor: const Color(0xFFF97316),
         unselectedItemColor: Colors.grey,
         currentIndex: 0, // Home tab is selected
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Beranda'),
-          BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'Fitur'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.article), label: 'Postingan'),
-          BottomNavigationBarItem(icon: Icon(Icons.work), label: 'Ruang Kerja'),
+          BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'Cuti'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
         ],
         onTap: (index) {
           if (index == 1) {
             Navigator.pushReplacementNamed(context, '/features');
           } else if (index == 2) {
-            Navigator.pushReplacementNamed(context, '/posts');
-          } else if (index == 3) {
-            Navigator.pushReplacementNamed(context, '/workspace');
-          } else if (index == 4) {
             Navigator.pushReplacementNamed(context, '/profile');
           }
         },
@@ -1541,7 +1568,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _logout();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF18222),
+                backgroundColor: const Color(0xFFF97316),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1589,7 +1616,7 @@ class _HomeScreenState extends State<HomeScreen> {
               end: Alignment.bottomRight,
             ),
           ),
-          child: Icon(icon, color: Colors.deepOrange, size: 20),
+          child: Icon(icon, color: const Color(0xFFF97316), size: 20),
         ),
         const SizedBox(height: 6),
         Text(label, style: const TextStyle(fontSize: 12)),

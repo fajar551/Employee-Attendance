@@ -110,9 +110,9 @@ class _SplashScreenState extends State<SplashScreen>
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Cloud element at bottom
+          // Cloud element at bottom - sampai ke bawah
           Positioned(
-            bottom: 0,
+            bottom: 5, // Ubah dari 0 ke 20 agar lebih ke atas
             left: 0,
             right: 0,
             child: AnimatedBuilder(
@@ -129,70 +129,75 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           ),
 
-          // Logo in center
+          // Logo in center - dipindah lebih ke atas
           Center(
             child: AnimatedBuilder(
               animation: _logoAnimation,
               builder: (context, child) {
                 return Transform.scale(
                   scale: _logoAnimation.value,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Logo circle
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: const BoxDecoration(
-                          color: Colors.orange,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.person,
-                          color: Colors.white,
-                          size: 60,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Text "Absensi Qwords" with animation
-                      SlideTransition(
-                        position: _textSlideAnimation,
-                        child: FadeTransition(
-                          opacity: _textFadeAnimation,
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Absensi ',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              Text(
-                                'Qwords',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.orange,
-                                ),
-                              ),
-                            ],
+                  child: Transform.translate(
+                    offset:
+                        const Offset(0, -80), // Geser ke atas dari -30 ke -80
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Logo circle
+                        Container(
+                          width: 120,
+                          height: 120,
+                          decoration: const BoxDecoration(
+                            color: Colors.orange,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 60,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 20),
+
+                        // Text "Absensi Qwords" with animation
+                        SlideTransition(
+                          position: _textSlideAnimation,
+                          child: FadeTransition(
+                            opacity: _textFadeAnimation,
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Absensi ',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                Text(
+                                  'Qwords',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
             ),
           ),
 
-          // Version text at bottom
+          // Version text at bottom - tanpa padding manual
           Positioned(
-            bottom: 40,
+            bottom:
+                55, // Posisi tetap, biarkan Flutter menangani navigation bar
             left: 0,
             right: 0,
             child: Center(
@@ -224,45 +229,45 @@ class CloudPainter extends CustomPainter {
 
     final path = Path();
 
-    // Create cloud-like shape at bottom - moved higher
+    // Create cloud-like shape at bottom - dibuat lebih rendah dan proporsional
     path.moveTo(0, size.height);
 
-    // Left side curve - moved higher
+    // Left side curve - dibuat lebih rendah
     path.quadraticBezierTo(
       size.width * 0.1,
-      size.height * 0.6, // Changed from 0.8 to 0.6
+      size.height * 0.7, // Ubah dari 0.6 ke 0.7
       size.width * 0.2,
-      size.height * 0.5, // Changed from 0.7 to 0.5
+      size.height * 0.6, // Ubah dari 0.5 ke 0.6
     );
 
-    // First bump - moved higher
+    // First bump - dibuat lebih rendah
     path.quadraticBezierTo(
       size.width * 0.3,
-      size.height * 0.4, // Changed from 0.6 to 0.4
+      size.height * 0.5, // Ubah dari 0.4 ke 0.5
       size.width * 0.4,
-      size.height * 0.5, // Changed from 0.7 to 0.5
+      size.height * 0.6, // Ubah dari 0.5 ke 0.6
     );
 
-    // Second bump - moved higher
+    // Second bump - dibuat lebih rendah
     path.quadraticBezierTo(
       size.width * 0.5,
-      size.height * 0.3, // Changed from 0.5 to 0.3
+      size.height * 0.4, // Ubah dari 0.3 ke 0.4
       size.width * 0.6,
-      size.height * 0.5, // Changed from 0.7 to 0.5
+      size.height * 0.6, // Ubah dari 0.5 ke 0.6
     );
 
-    // Third bump - moved higher
+    // Third bump - dibuat lebih rendah
     path.quadraticBezierTo(
       size.width * 0.7,
-      size.height * 0.4, // Changed from 0.6 to 0.4
+      size.height * 0.5, // Ubah dari 0.4 ke 0.5
       size.width * 0.8,
-      size.height * 0.5, // Changed from 0.7 to 0.5
+      size.height * 0.6, // Ubah dari 0.5 ke 0.6
     );
 
-    // Right side curve - moved higher
+    // Right side curve - dibuat lebih rendah
     path.quadraticBezierTo(
       size.width * 0.9,
-      size.height * 0.6, // Changed from 0.8 to 0.6
+      size.height * 0.7, // Ubah dari 0.6 ke 0.7
       size.width,
       size.height,
     );

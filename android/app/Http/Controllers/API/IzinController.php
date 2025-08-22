@@ -12,11 +12,9 @@ use App\Models\Karyawan;
 use App\Models\StatusHadir;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Response;
 
 class IzinController extends Controller
 {
@@ -26,6 +24,28 @@ class IzinController extends Controller
             ->leftJoin('karyawan', 'hr_cuti.karyawan_id', '=', 'karyawan.id')
             ->leftJoin('hr_status_hadir', 'hr_cuti.status_hadir_id', '=', 'hr_status_hadir.id')
             ->where('hr_cuti.karyawan_id', auth()->user()->karyawan_id)
+            ->orderBy('hr_cuti.id', 'desc')
+            ->get()
+            ->map(function ($item) {
+                $tanggalAwal = Carbon::parse($item->tanggal_awal);
+                $tanggalAkhir = Carbon::parse($item->tanggal_akhir);
+
+                $item->jumlah_hari = $tanggalAwal->diffInDays($tanggalAkhir) + 1;
+
+                return $item;
+            });
+
+        return response()->json([
+            'data' => $izin,
+            'message' => 'Data Success'
+        ], 200);
+    }
+
+    public function allIzin()
+    {
+        $izin = Izin::select('hr_cuti.*', 'karyawan.nama as nama_karyawan', 'hr_status_hadir.nama as nama_status_hadir')
+            ->leftJoin('karyawan', 'hr_cuti.karyawan_id', '=', 'karyawan.id')
+            ->leftJoin('hr_status_hadir', 'hr_cuti.status_hadir_id', '=', 'hr_status_hadir.id')
             ->orderBy('hr_cuti.id', 'desc')
             ->get()
             ->map(function ($item) {
@@ -471,7 +491,7 @@ class IzinController extends Controller
             $izinId = $request->izin_id;
             $userHash = $request->user_hash;
 
-            Log::info('Auto login attempt', [
+            \Log::info('Auto login attempt', [
                 'izin_id' => $izinId,
                 'user_hash' => $userHash
             ]);
@@ -488,7 +508,7 @@ class IzinController extends Controller
                 ->where('hr_user_groups.kode', 'HRD')
                 ->get();
 
-            Log::info('HRD users found', ['count' => $usersHrd->count()]);
+            \Log::info('HRD users found', ['count' => $usersHrd->count()]);
 
             if ($usersHrd->isEmpty()) {
                 return response()->json([
@@ -499,7 +519,7 @@ class IzinController extends Controller
             // Jika ada user_hash, decode untuk mendapatkan user_id
             if ($userHash) {
                 $userId = $this->decodeUserId($userHash);
-                Log::info('Decoded user_id', ['user_id' => $userId]);
+                \Log::info('Decoded user_id', ['user_id' => $userId]);
 
                 if ($userId) {
                     $userHrd = $usersHrd->where('id', $userId)->first();
@@ -511,12 +531,12 @@ class IzinController extends Controller
                 } else {
                     // Fallback ke user HRD pertama jika hash tidak valid
                     $userHrd = $usersHrd->first();
-                    Log::warning('Invalid user hash, using first HRD user', ['user_id' => $userHrd->id]);
+                    \Log::warning('Invalid user hash, using first HRD user', ['user_id' => $userHrd->id]);
                 }
             } else {
                 // Jika tidak ada user_hash, ambil user HRD pertama sebagai default
                 $userHrd = $usersHrd->first();
-                Log::info('No user hash, using first HRD user', ['user_id' => $userHrd->id]);
+                \Log::info('No user hash, using first HRD user', ['user_id' => $userHrd->id]);
             }
 
             $izin = Izin::select('hr_cuti.*', 'hr_status_hadir.nama as nama_status_hadir')
@@ -532,7 +552,7 @@ class IzinController extends Controller
 
             $accessToken = $userHrd->createToken('notification_token')->plainTextToken;
 
-            Log::info('Auto login successful', [
+            \Log::info('Auto login successful', [
                 'user_id' => $userHrd->id,
                 'izin_id' => $izinId
             ]);
@@ -547,7 +567,7 @@ class IzinController extends Controller
                 'message' => 'Auto login successful'
             ], 200);
         } catch (Exception $e) {
-            Log::error('Auto login error', [
+            \Log::error('Auto login error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -585,5 +605,212 @@ class IzinController extends Controller
             'data' => $userHrd,
             'message' => 'Data Success'
         ], 200);
+    }
+
+    public function getRole()
+    {
+        try {
+            $role = User::select('hr_user_groups.nama as role_name')
+                ->leftJoin('hr_user_groups', 'hr_user_groups.id', '=', 'hr_users.user_group_id')
+                ->where('hr_users.id', auth()->user()->id)
+                ->first();
+
+            if (!$role) {
+                return response()->json([
+                    'data' => null,
+                    'message' => 'Role tidak ditemukan'
+                ], 404);
+            }
+
+            return response()->json([
+                'data' => $role,
+                'message' => 'Data Success'
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getProfileKaryawan()
+    {
+        try {
+            $karyawan = Karyawan::select(
+                'karyawan.nip',
+                'karyawan.nama',
+                'karyawan.departemen_id',
+                'karyawan.jabatan_id',
+                'karyawan.tempat_lahir',
+                'karyawan.tanggal_lahir',
+                'karyawan.gender',
+                'karyawan.alamat',
+                'karyawan.npwp',
+                'karyawan.no_rekening',
+                'karyawan.bank_id',
+                'karyawan.status_perkawinan',
+                'karyawan.jumlah_anak',
+                'karyawan.pendidikan',
+                'karyawan.no_telepon',
+                'karyawan.pemilik_rekening',
+                'karyawan.created_at',
+                'karyawan.created_by',
+                'karyawan.updated_by',
+                'karyawan.updated_at',
+                'karyawan.image',
+                'karyawan.nik',
+                'karyawan.agama',
+                'karyawan.kewarganegaraan',
+                'karyawan.tanggal_masuk',
+                'karyawan.tanggal_keluar',
+                'karyawan.status_kerja',
+                'karyawan.deleted_at',
+                'karyawan.tanggal_resign',
+                'karyawan.lokasi_kerja',
+                'karyawan.status',
+                'karyawan.id_finger',
+                'karyawan.id_kartu',
+                'karyawan.alamat_domisili',
+                'departemen.nama as nama_departemen',
+                'jabatan.nama as nama_jabatan',
+                'bank.nama as nama_bank'
+            )
+                ->leftJoin('departemen', 'departemen.id', '=', 'karyawan.departemen_id')
+                ->leftJoin('jabatan', 'jabatan.id', '=', 'karyawan.jabatan_id')
+                ->leftJoin('bank', 'bank.id', '=', 'karyawan.bank_id')
+                ->where('karyawan.id', auth()->user()->karyawan_id)
+                ->first();
+
+            if (!$karyawan) {
+                return response()->json([
+                    'data' => null,
+                    'message' => 'Profil karyawan tidak ditemukan'
+                ], 404);
+            }
+
+            return response()->json([
+                'data' => $karyawan,
+                'message' => 'Data Success'
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getAllKaryawan()
+    {
+        try {
+            $karyawan = Karyawan::select(
+                'karyawan.id',
+                'karyawan.nip',
+                'karyawan.nama',
+                'karyawan.departemen_id',
+                'karyawan.jabatan_id',
+                'karyawan.tempat_lahir',
+                'karyawan.tanggal_lahir',
+                'karyawan.gender',
+                'karyawan.alamat',
+                'karyawan.npwp',
+                'karyawan.no_rekening',
+                'karyawan.bank_id',
+                'karyawan.status_perkawinan',
+                'karyawan.jumlah_anak',
+                'karyawan.pendidikan',
+                'karyawan.no_telepon',
+                'karyawan.pemilik_rekening',
+                'karyawan.created_at',
+                'karyawan.created_by',
+                'karyawan.updated_by',
+                'karyawan.updated_at',
+                'karyawan.image',
+                'karyawan.nik',
+                'karyawan.agama',
+                'karyawan.kewarganegaraan',
+                'karyawan.tanggal_masuk',
+                'karyawan.tanggal_keluar',
+                'karyawan.status_kerja',
+                'karyawan.deleted_at',
+                'karyawan.tanggal_resign',
+                'karyawan.lokasi_kerja',
+                'karyawan.status',
+                'karyawan.id_finger',
+                'karyawan.id_kartu',
+                'karyawan.alamat_domisili'
+            )
+                ->orderBy('karyawan.nama', 'asc')
+                ->get();
+
+            return response()->json([
+                'data' => $karyawan,
+                'message' => 'Data Success'
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getKaryawanById($id)
+    {
+        try {
+            $karyawan = Karyawan::select(
+                'karyawan.id',
+                'karyawan.nip',
+                'karyawan.nama',
+                'karyawan.departemen_id',
+                'karyawan.jabatan_id',
+                'karyawan.tempat_lahir',
+                'karyawan.tanggal_lahir',
+                'karyawan.gender',
+                'karyawan.alamat',
+                'karyawan.npwp',
+                'karyawan.no_rekening',
+                'karyawan.bank_id',
+                'karyawan.status_perkawinan',
+                'karyawan.jumlah_anak',
+                'karyawan.pendidikan',
+                'karyawan.no_telepon',
+                'karyawan.pemilik_rekening',
+                'karyawan.created_at',
+                'karyawan.created_by',
+                'karyawan.updated_by',
+                'karyawan.updated_at',
+                'karyawan.image',
+                'karyawan.nik',
+                'karyawan.agama',
+                'karyawan.kewarganegaraan',
+                'karyawan.tanggal_masuk',
+                'karyawan.tanggal_keluar',
+                'karyawan.status_kerja',
+                'karyawan.deleted_at',
+                'karyawan.tanggal_resign',
+                'karyawan.lokasi_kerja',
+                'karyawan.status',
+                'karyawan.id_finger',
+                'karyawan.id_kartu',
+                'karyawan.alamat_domisili'
+            )
+                ->where('karyawan.id', $id)
+                ->first();
+
+            if (!$karyawan) {
+                return response()->json([
+                    'data' => null,
+                    'message' => 'Karyawan dengan ID tersebut tidak ditemukan'
+                ], 404);
+            }
+
+            return response()->json([
+                'data' => $karyawan,
+                'message' => 'Data Success'
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

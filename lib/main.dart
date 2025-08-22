@@ -2,9 +2,12 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'screens/all_izin_screen.dart';
+import 'screens/detail_cuti_screen.dart';
 import 'screens/features_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/izin_screen.dart';
+import 'screens/list_cuti_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/posts_screen.dart';
 import 'screens/profile_screen.dart';
@@ -42,6 +45,12 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
         '/features': (context) => const FeaturesScreen(),
         '/izin': (context) => const IzinScreen(),
+        '/list-cuti': (context) => const ListCutiScreen(),
+        '/all-izin': (context) => const AllIzinScreen(),
+        '/detail-cuti': (context) => DetailCutiScreen(
+              cutiId: (ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>)['id'],
+            ),
         '/posts': (context) => const PostsScreen(),
         '/workspace': (context) => const WorkspaceScreen(),
         '/profile': (context) => const ProfileScreen(),
