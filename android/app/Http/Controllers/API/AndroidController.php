@@ -4,11 +4,11 @@ namespace App\Http\Controllers\API;
 
 use App\Models\User;
 use App\Models\Absensi;
+use App\Models\Karyawan;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-
 
 class AndroidController extends Controller
 {
@@ -79,13 +79,37 @@ class AndroidController extends Controller
         }
 
         $data = $validator->validated();
+        $karyawan = Karyawan::where('id', auth()->user()->karyawan_id)->first();
 
         // $kantorLat = 37.4219980;
         // $kantorLng = -122.084;
         // $radius = 40000; // meter
 
-        $kantorLat = -6.881233;
-        $kantorLng = 107.587617;
+        // $kantorLat = -6.881233;
+        // $kantorLng = 107.587617;
+        // $radius = 100; // meter
+
+        // Bandung
+        if ($karyawan->lokasi_kerja == 1) {
+            $kantorLat = -6.881499;
+            $kantorLng = 107.587616;
+        }
+        // Jakarta
+        else if ($karyawan->lokasi_kerja == 2) {
+            $kantorLat = -6.238457;
+            $kantorLng = 106.824057;
+        }
+        // Yogyakarta
+        else if ($karyawan->lokasi_kerja == 3) {
+            $kantorLat = -7.736588;
+            $kantorLng = 110.420674;
+        }
+        // Surabaya
+        else if ($karyawan->lokasi_kerja == 4) {
+            $kantorLat = -7.261679;
+            $kantorLng = 112.785904;
+        }
+
         $radius = 100; // meter
 
         $jarak = $this->hitungJarak($kantorLat, $kantorLng, $data['latitude'], $data['longitude']);
@@ -107,11 +131,11 @@ class AndroidController extends Controller
             ->get();
 
         // Tentukan flag
-        $flag = 1;
-        if ($absensiToday->where('flag', 1)->count() > 0 && $absensiToday->where('flag', 2)->count() == 0) {
-            $flag = 2;
-        } elseif ($absensiToday->where('flag', 2)->count() > 0) {
-            // Sudah absen keluar hari ini, bisa return error atau reset ke 1 jika diizinkan
+        $flag = 'masuk';
+        if ($absensiToday->where('flag', 'masuk')->count() > 0 && $absensiToday->where('flag', 'keluar')->count() == 0) {
+            $flag = 'keluar';
+        } elseif ($absensiToday->where('flag', 'keluar')->count() > 0) {
+            // Sudah absen keluar hari ini, bisa return error atau reset ke masuk jika diizinkan
             return response()->json([
                 'message' => 'Sudah absen masuk dan keluar hari ini',
             ], 400);
@@ -120,12 +144,12 @@ class AndroidController extends Controller
         // Simpan foto
         $imageName = 'absensi_' . time() . '.png';
         $image = base64_decode(str_replace(' ', '+', str_replace('data:image/png;base64,', '', $data['foto'])));
-        
+
         $uploadPath = public_path('uploads/absensi');
         if (!file_exists($uploadPath)) {
             mkdir($uploadPath, 0755, true);
         }
-        
+
         file_put_contents($uploadPath . '/' . $imageName, $image);
 
         $absensi = Absensi::create([

@@ -25,7 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _tanggalAbsenTerakhir;
   final ImagePicker _picker = ImagePicker();
   DateTime? _lastAttendanceTime;
-  int? _todayFlag; // null = belum absen, 1 = sudah masuk, 2 = sudah keluar
+  String?
+      _todayFlag; // null = belum absen, "masuk" = sudah masuk, "keluar" = sudah keluar
   List<Map<String, dynamic>> _attendanceHistory = [];
   String? _authToken; // Token untuk API
   Position? _currentPosition; // Posisi saat ini
@@ -58,13 +59,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (todayAbsensi.isEmpty) {
       _todayFlag = null;
     } else {
-      // Ambil flag terbesar hari ini (1 = masuk, 2 = keluar)
-      final flags = todayAbsensi
-          .map((e) => (e['flag'] is int)
-              ? e['flag']
-              : int.tryParse(e['flag'].toString()) ?? 1)
-          .toList();
-      _todayFlag = flags.fold<int>(1, (prev, el) => el > prev ? el : prev);
+      // Ambil flag terakhir hari ini
+      final flags =
+          todayAbsensi.map((e) => e['flag']?.toString() ?? 'masuk').toList();
+
+      // Jika ada "keluar", maka flag = "keluar", jika tidak maka "masuk"
+      _todayFlag = flags.contains('keluar') ? 'keluar' : 'masuk';
     }
     print('Debug: _todayFlag:  [32m [1m [4m$_todayFlag [0m');
   }
@@ -232,9 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
             'latitude': absensi['latitude'],
             'longitude': absensi['longitude'],
             'waktu_absen': absensi['waktu_absen'],
-            'flag': (absensi['flag'] is int)
-                ? absensi['flag']
-                : int.tryParse(absensi['flag'].toString()) ?? 1,
+            'flag': absensi['flag']?.toString() ?? 'masuk',
           });
 
           // Debug print untuk foto
@@ -381,13 +379,13 @@ class _HomeScreenState extends State<HomeScreen> {
           final absensiMasuk = _attendanceHistory.firstWhere(
             (item) =>
                 item['waktu_absen'].toString().startsWith(today) &&
-                item['flag'] == 1,
+                item['flag'] == 'masuk',
             orElse: () => {},
           );
           final absensiKeluar = _attendanceHistory.firstWhere(
             (item) =>
                 item['waktu_absen'].toString().startsWith(today) &&
-                item['flag'] == 2,
+                item['flag'] == 'keluar',
             orElse: () => {},
           );
 
@@ -521,7 +519,8 @@ class _HomeScreenState extends State<HomeScreen> {
         'longitude': _currentPosition!.longitude,
         'foto': fotoBase64,
         'waktu_absen': waktuAbsen,
-        'flag': (_todayFlag == null || _todayFlag == 1) ? '1' : '2',
+        'flag':
+            (_todayFlag == null || _todayFlag == 'masuk') ? 'masuk' : 'keluar',
       };
 
       print('Debug: Sending data to API...');
@@ -675,18 +674,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isTimeIn = _todayFlag == null || _todayFlag == 2;
+    final isTimeIn = _todayFlag == null || _todayFlag == 'keluar';
 
     // Ambil absensi hari ini dari history
     final today = DateTime.now().toString().substring(0, 10);
     final absensiMasuk = _attendanceHistory.firstWhere(
       (item) =>
-          item['waktu_absen'].toString().startsWith(today) && item['flag'] == 1,
+          item['waktu_absen'].toString().startsWith(today) &&
+          item['flag'] == 'masuk',
       orElse: () => {},
     );
     final absensiKeluar = _attendanceHistory.firstWhere(
       (item) =>
-          item['waktu_absen'].toString().startsWith(today) && item['flag'] == 2,
+          item['waktu_absen'].toString().startsWith(today) &&
+          item['flag'] == 'keluar',
       orElse: () => {},
     );
 
@@ -822,23 +823,9 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          'PT Qwords Company Intern...',
+          'PT Qwords Company Internasional',
           style: TextStyle(color: Colors.black, fontSize: 16),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.arrow_forward_ios, color: Colors.black),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.black),
-            onPressed: () => _showLogoutDialog(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.black),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -1251,55 +1238,30 @@ class _HomeScreenState extends State<HomeScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _buildFavoriteMenuItem(
-                              Icons.receipt_long, 'Slip Gaji Saya', [
-                            const Color(0xFFFEF6E0),
-                            const Color(0xFFFFE0B2)
-                          ]),
+                              Icons.description,
+                              'Permintaan Cuti',
+                              [
+                                const Color(0xFFFFF3E0),
+                                const Color(0xFFFFE0B2)
+                              ],
+                              () => Navigator.pushNamed(context, '/izin')),
                           _buildFavoriteMenuItem(
-                              Icons.event_note, 'Aktivitas Harian', [
-                            const Color(0xFFE0F7FA),
-                            const Color(0xFFB2EBF2)
-                          ]),
+                              Icons.calendar_month,
+                              'List Cuti Saya',
+                              [
+                                const Color(0xFFE0F7FA),
+                                const Color(0xFFB2EBF2)
+                              ],
+                              () => Navigator.pushNamed(context, '/list-cuti')),
                           _buildFavoriteMenuItem(
-                              Icons.chat_bubble_outline, 'Obrolan', [
-                            const Color(0xFFEDE7F6),
-                            const Color(0xFFD1C4E9)
-                          ]),
+                              Icons.list_alt,
+                              'Lainnya ...',
+                              [
+                                const Color(0xFFEDE7F6),
+                                const Color(0xFFD1C4E9)
+                              ],
+                              () => Navigator.pushNamed(context, '/features')),
                         ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // Info Perusahaan Card
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: Colors.grey.shade200, width: 1),
-                ),
-                color: Colors.white,
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Informasi Perusahaan',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16)),
-                      const SizedBox(height: 12),
-                      Center(
-                        child: Icon(Icons.insert_drive_file,
-                            size: 48, color: Colors.grey[300]),
-                      ),
-                      const SizedBox(height: 8),
-                      const Center(
-                        child: Text('Belum ada informasi',
-                            style: TextStyle(color: Colors.grey)),
                       ),
                     ],
                   ),
@@ -1601,26 +1563,29 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Widget _buildFavoriteMenuItem(
-      IconData icon, String label, List<Color> gradientColors) {
-    return Column(
-      children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: gradientColors,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+  Widget _buildFavoriteMenuItem(IconData icon, String label,
+      List<Color> gradientColors, VoidCallback? onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: gradientColors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
+            child: Icon(icon, color: const Color(0xFFF97316), size: 20),
           ),
-          child: Icon(icon, color: const Color(0xFFF97316), size: 20),
-        ),
-        const SizedBox(height: 6),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
+          const SizedBox(height: 6),
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
+      ),
     );
   }
 }

@@ -53,14 +53,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           _karyawanData = response['data'];
         });
+      } else {
+        // Jika data kosong, set default data
+        setState(() {
+          _karyawanData = {
+            'nama': 'User',
+            'nik': '-',
+            'no_telepon': '-',
+            'tanggal_lahir': '-',
+            'tempat_lahir': '-',
+            'tanggal_masuk': '-',
+            'alamat': '-',
+            'status_perkawinan': '-',
+            'jumlah_anak': '-',
+            'pendidikan': '-',
+            'status': false,
+          };
+        });
       }
     } catch (e) {
       print('Error loading karyawan data: $e');
+      // Jika terjadi error, set default data
+      setState(() {
+        _karyawanData = {
+          'nama': 'User',
+          'nik': '-',
+          'no_telepon': '-',
+          'tanggal_lahir': '-',
+          'tempat_lahir': '-',
+          'tanggal_masuk': '-',
+          'alamat': '-',
+          'status_perkawinan': '-',
+          'jumlah_anak': '-',
+          'pendidikan': '-',
+          'status': false,
+        };
+      });
     } finally {
       setState(() {
         _isLoading = false;
       });
     }
+  }
+
+  // Helper function untuk mengecek apakah data adalah data default
+  bool _isDefaultData() {
+    if (_karyawanData == null) return true;
+    return _karyawanData!['nama'] == 'User' && _karyawanData!['nik'] == '-';
   }
 
   @override
@@ -244,6 +283,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: Colors.black87,
                   ),
                 ),
+                // Tampilkan pesan jika data default
+                if (_isDefaultData())
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Nama belum diisi',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
               ],
             )
           else
@@ -319,6 +371,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           if (_karyawanData != null) ...[
+            // Tampilkan pesan jika data kosong
+            if (_isDefaultData())
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: Colors.orange[700],
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Data profil belum tersedia. Silakan hubungi admin untuk mengisi data lengkap.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.orange[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -384,9 +468,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildSimpleDetailRow(
                     icon: Icons.verified,
                     title: 'Status',
-                    value: _karyawanData!['status'] == true
-                        ? 'Aktif'
-                        : 'Tidak Aktif',
+                    value: _karyawanData!['status'] == true ? 'Aktif' : '-',
                     valueColor: _karyawanData!['status'] == true
                         ? Colors.green
                         : Colors.red,
@@ -472,44 +554,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: Column(
         children: [
-          // Edit Profile button
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: const Color(0xFFF97316),
-                width: 1.5,
-              ),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  // TODO: Implement edit profile
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Edit Profile',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFFF97316),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
           // Logout button
           Container(
             width: double.infinity,

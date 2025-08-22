@@ -710,6 +710,64 @@ class _AllIzinScreenState extends State<AllIzinScreen> {
                     ),
                   ],
                 ),
+      bottomNavigationBar: _buildBottomNavigation(),
+    );
+  }
+
+  Widget _buildBottomNavigation() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          selectedItemColor: const Color(0xFFF97316),
+          unselectedItemColor: const Color(0xFF94A3B8),
+          selectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 12,
+          ),
+          elevation: 0,
+          currentIndex: 1, // Cuti tab is selected
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_rounded, size: 24),
+              label: 'Beranda',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.grid_view_rounded, size: 24),
+              label: 'Cuti',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_rounded, size: 24),
+              label: 'Profil',
+            ),
+          ],
+          onTap: (index) {
+            if (index == 0) {
+              Navigator.pushReplacementNamed(context, '/home');
+            } else if (index == 1) {
+              Navigator.pushReplacementNamed(context, '/features');
+            } else if (index == 2) {
+              Navigator.pushReplacementNamed(context, '/profile');
+            }
+          },
+        ),
+      ),
     );
   }
 

@@ -300,6 +300,7 @@ class _FeaturesScreenState extends State<FeaturesScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         shadowColor: Colors.transparent,
+        centerTitle: true,
         title: const Text(
           'Cuti',
           style: TextStyle(
