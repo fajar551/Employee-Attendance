@@ -36,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final bool _showAllHistory = false;
   bool _showHistorySection = true;
   String? _userRole; // Role user
+  Map<String, dynamic>? _polaKerjaData; // Data pola kerja dari API
 
   @override
   void initState() {
@@ -99,6 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       await _loadAttendanceHistory();
       await _loadUserRole(); // Load role user
+      await _loadPolaKerja(); // Load pola kerja
       if (_userData == null || _userData!['name'] == null) {
         await _loadUserDataFromAPI();
       }
@@ -135,6 +137,49 @@ class _HomeScreenState extends State<HomeScreen> {
       print('Debug: Error loading user role: $e');
       setState(() {
         _userRole = 'User'; // Default role jika error
+      });
+    }
+  }
+
+  // Function untuk load data pola kerja dari API
+  Future<void> _loadPolaKerja() async {
+    if (_authToken == null || _authToken!.isEmpty) {
+      print('Debug: Token tidak ada, tidak bisa load pola kerja');
+      return;
+    }
+
+    try {
+      print('Debug: Loading pola kerja from API...');
+
+      final responseData = await ApiService.getPolaKerja(_authToken!);
+
+      print('Debug: Pola kerja response data: $responseData');
+
+      if (responseData['data'] != null) {
+        setState(() {
+          _polaKerjaData = responseData['data'];
+        });
+        print('Debug: Pola kerja loaded successfully: $_polaKerjaData');
+      } else {
+        print('Debug: Pola kerja data tidak ditemukan dalam response');
+        setState(() {
+          _polaKerjaData = {
+            'nama_pola_kerja': 'Reguler',
+            'format_waktu_kerja': 'Reguler [08:00 - 17:00]',
+            'waktu_mulai': '08:00:00',
+            'waktu_akhir': '17:00:00',
+          };
+        });
+      }
+    } catch (e) {
+      print('Debug: Error loading pola kerja: $e');
+      setState(() {
+        _polaKerjaData = {
+          'nama_pola_kerja': 'Reguler',
+          'format_waktu_kerja': 'Reguler [08:00 - 17:00]',
+          'waktu_mulai': '08:00:00',
+          'waktu_akhir': '17:00:00',
+        };
       });
     }
   }
@@ -896,8 +941,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 4),
-                  const Text('Shift: Regular 1 [08:00 - 17:00]',
-                      style: TextStyle(fontSize: 13, color: Colors.grey)),
+                  Text(
+                    'Shift: ${_polaKerjaData?['format_waktu_kerja'] ?? 'Reguler [08:00 - 17:00]'}',
+                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
                   // Tambahkan garis bawah setelah shift
                   const Padding(
                     padding: EdgeInsets.only(top: 4, bottom: 4),
@@ -1132,13 +1179,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            _buildFilterTab('All', true),
-                            const SizedBox(width: 8),
-                            _buildFilterTab('Offline 3', false),
-                          ],
-                        ),
+                        // Filter Tab (All dan Offline 3) 
+                        // Row(
+                        //   children: [
+                        //     _buildFilterTab('All', true),
+                        //     const SizedBox(width: 8),
+                        //     _buildFilterTab('Offline 3', false),
+                        //   ],
+                        // ),
                         const SizedBox(height: 16),
                         if (_isLoadingHistory)
                           const Center(

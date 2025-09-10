@@ -213,6 +213,18 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> getPolaKerja(String token) async {
+    try {
+      return await _makeRequest('$baseUrl/getPolaKerja', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    } catch (e) {
+      print(
+          'Get pola kerja dengan domain gagal, mencoba dengan IP address: $e');
+      return await _makeRequest('$fallbackUrl/getPolaKerja', 'GET',
+          headers: {'Authorization': 'Bearer $token'});
+    }
+  }
+
   static Future<Map<String, dynamic>> _makeRequest(String url, String method,
       {Map<String, String>? headers, Map<String, dynamic>? body}) async {
     try {
